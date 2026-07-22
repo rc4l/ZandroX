@@ -82,10 +82,6 @@ extern "C" int cc_install_handlers(int, char**, int, int*, const char*, int(*)(c
 
 // EXTERNAL DATA DECLARATIONS ----------------------------------------------
 
-#ifdef USE_XCURSOR
-extern bool UseXCursor;
-#endif
-
 // PUBLIC DATA DEFINITIONS -------------------------------------------------
 
 #ifndef NO_GTK
@@ -318,9 +314,6 @@ int main (int argc, char **argv)
 		if (viddriver != NULL)
 		{
 			printf("Using video driver %s\n", viddriver);
-#ifdef USE_XCURSOR
-			UseXCursor = (strcmp(viddriver, "x11") == 0);
-#endif
 		}
 		printf("\n");
 	}

@@ -47,6 +47,12 @@
 #define PI				3.14159265358979323846		// matches value in gcc v2 math.h
 #endif
 
+// [rc4l] MSVC's math.h only defines M_PI under _USE_MATH_DEFINES; the hwrender additions below
+// (Rotate2D and friends) use it, so provide the standard value when the compiler didn't.
+#ifndef M_PI
+#define M_PI			3.14159265358979323846
+#endif
+
 #define EQUAL_EPSILON (1/65536.f)
 
 
