@@ -28,9 +28,12 @@ archive's *adapted* copy at `features/hwrender/backend/`.
   consumers — pure collision, now defers to `basictypes.h`); the `textures.h` conflict was resolved
   keeping the fixed64 casts; every applied hunk audited for `FRACBITS`/narrowing patterns.
 - **pk3 verified:** 30 `shaders/hwrender/` lumps + the OpenGL Options menu are in `zandronum.pk3`.
-- **Vulkan wiring:** `HAVE_VULKAN` (default OFF — CI untouched) + `add_subdirectory(ZVulkan)` + link;
-  `mac_compile.sh` auto-detects the MoltenVK/vulkan-headers/vulkan-loader brew kegs and opts in,
-  or warns and builds without. `vid_hwrender 2` resolves to core GL until a Vulkan device exists.
+- **Vulkan wiring — verified building and linking:** `HAVE_VULKAN` (default OFF — CI untouched) +
+  `add_subdirectory(ZVulkan)` + link; `mac_compile.sh` auto-detects the MoltenVK/vulkan-headers/
+  vulkan-loader brew kegs and opts in, or warns and builds without (both paths built green).
+  `build/ZVulkan/libzvulkan.a` compiles (volk + vk_mem_alloc + glslang) and links into the app; the
+  bundler carries `libvulkan.1.dylib` at `@loader_path`, so the app stays self-contained. MoltenVK
+  ICD discovery at runtime is a P5 item. `vid_hwrender 2` resolves to core GL until a device exists.
 
 ## NOT verified (the honest gap)
 
