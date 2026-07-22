@@ -386,7 +386,8 @@ template<class T, class TT=T>
 class TDeletingArray : public TArray<T, TT>
 {
 public:
-	~TDeletingArray<T, TT> ()
+	// [rc4l] No template-id on a destructor: C++20 made it ill-formed and GCC enforces it.
+	~TDeletingArray ()
 	{
 		for (unsigned int i = 0; i < TArray<T,TT>::Size(); ++i)
 		{

@@ -83,7 +83,7 @@ enum EEffect
 	EFF_SPHEREMAP,
 };
 
-class FRenderState
+class LegacyFRenderState
 {
 	bool mTextureEnabled;
 	bool mFogEnabled;
@@ -128,7 +128,7 @@ class FRenderState
 	bool ApplyShader();
 
 public:
-	FRenderState()
+	LegacyFRenderState()
 	{
 		Reset();
 	}
@@ -278,6 +278,6 @@ public:
 	}
 };
 
-extern FRenderState gl_RenderState;
+extern LegacyFRenderState gl_RenderState;
 
 #endif

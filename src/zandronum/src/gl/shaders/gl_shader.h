@@ -19,7 +19,7 @@ const int VATTR_LIGHTLEVEL = 13; // Korshun.
 class FShader
 {
 	friend class FShaderContainer;
-	friend class FRenderState;
+	friend class LegacyFRenderState;
 
 	unsigned int hShader;
 	unsigned int hVertProg;
