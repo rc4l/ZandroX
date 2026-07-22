@@ -54,7 +54,17 @@ nothing draws through the ported path here yet.
 
 ## Build note
 
-`build-tests` (the GoogleTest project) is the only thing built and passing on this branch. A full
-engine build via `mac_compile.sh` validates the C++ cvar addition compiles/links; update this line
-with the result once that build completes. The vendored `rendering/`/`ZVulkan` trees are not in the
-engine's source list, so they do not affect the engine build yet.
+Both build paths pass on this branch:
+
+- `build-tests` (GoogleTest): **124 tests green, 100% coverage** on every new `computation/` unit.
+- Full engine build via `mac_compile.sh`: **exit 0** — `ZandroX.app` and `zandronum.pk3` rebuilt.
+  This confirms the `vid_hwrender` cvar and the `menudef.txt` OpenGL Options submenu compile, link,
+  and package. The engine also compiles the `features/hwrender/computation/*.cpp` into itself (they
+  were made C++14-clean after the build flagged an `inline constexpr` C++17 extension warning).
+
+The vendored `rendering/`/`ZVulkan` trees are **not** in the engine's source list yet, so they do
+not affect the engine build — bringing them up is the P1 step above.
+
+**Not yet done:** runtime verification. The new OpenGL Options submenu compiles and packages, but has
+not been confirmed on screen via the MCP (`launch_instance` → menu nav → `screenshot`). Nothing draws
+through the ported backend on this branch.
