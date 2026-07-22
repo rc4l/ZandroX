@@ -343,6 +343,18 @@ void STACK_ARGS DCanvas::DrawTextureV(FTexture *img, double x, double y, uint32 
 
 bool DCanvas::ParseDrawTextureTags (FTexture *img, double x, double y, DWORD tag, va_list tags, DrawParms *parms, bool hw) const
 {
+	// [rc4l] Members the ported 2D drawer reads but our tag parser never sets.
+	parms->desaturate = 0;
+	parms->color = 0xffffffff;
+	parms->burn = false;
+	parms->indexed = false;
+	parms->TranslationId = NO_TRANSLATION;
+	// [rc4l] Whole-texture source window, which is what every one of our call sites wants.
+	parms->srcx = 0.0; parms->srcy = 0.0;
+	parms->srcwidth = 1.0; parms->srcheight = 1.0;
+	parms->flipY = false;
+	parms->nooffset = false;
+	parms->rotateangle = 0.0;
 	INTBOOL boolval;
 	int intval;
 	bool translationset = false;
@@ -769,6 +781,8 @@ bool DCanvas::ParseDrawTextureTags (FTexture *img, double x, double y, DWORD tag
 			parms->style = STYLE_Normal;
 		}
 	}
+	// [rc4l] Keep the float mirror in step for the ported 2D drawer.
+	parms->Alpha = FIXED2FLOAT(parms->alpha);
 	return true;
 }
 

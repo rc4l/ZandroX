@@ -43,7 +43,6 @@
 #include "c_console.h"
 #include "c_cvars.h"
 #include "c_dispatch.h"
-#include "sdlvideo.h"
 #include "v_text.h"
 #include "doomstat.h"
 #include "m_argv.h"
@@ -88,10 +87,12 @@ CUSTOM_CVAR (Int, vid_renderer, 1, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 // [rc4l] Selects the hardware renderer backend for the modern-renderer port (see
 // docs/hwrender-portability-scope.md): 0 = legacy GL (fixed-function + GLSL 1.20 on a
 // compatibility context, today's renderer), 1 = ported core GL backend, 2 = Vulkan. The context
-// profile is chosen once at startup, so this is restart-only. Defaults to 0 so behaviour is
-// unchanged until the ported backend is wired up; the value is validated by
+// profile is chosen once at startup, so this is restart-only; the value is validated by
 // zx::ResolveBackend() at init (features/hwrender/computation/backendselect_compute).
-CVAR (Int, vid_hwrender, 0, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CUSTOM_CVAR (Int, vid_hwrender, 0, CVAR_ARCHIVE | CVAR_GLOBALCONFIG | CVAR_NOINITCALL)
+{
+	Printf("This won't take effect until " GAMENAME " is restarted.\n");
+}
 
 void I_ShutdownGraphics ()
 {
@@ -110,23 +111,15 @@ void I_InitGraphics ()
 {
 	UCVarValue val;
 
-#ifndef NO_GL
-	// hack by stevenaaus to force software mode if no 32bpp
-	const SDL_VideoInfo *i = SDL_GetVideoInfo();
-	if ((i->vfmt)->BytesPerPixel != 4) {
-		fprintf (stderr, "n32 bit colour not found, disabling OpenGL.n");
-		fprintf (stderr, "To enable OpenGL, restart X with 32 color (try 'startx -- :1 -depth 24'), and enable OpenGL in the Display Options.nn");
-	} 
-#endif
 	val.Bool = !!Args->CheckParm ("-devparm");
 	ticker.SetGenericRepDefault (val, CVAR_Bool);
 
 #ifndef NO_GL
-	//currentrenderer = vid_renderer;
-	if (currentrenderer==1) Video = new SDLGLVideo(0);
-	else Video = new SDLVideo (0);
+	// [rc4l] GL-only build: OpenGL is the only renderer, so there is no software video backend to fall back to.
+	Video = new SDLGLVideo(0);
 #else
-	Video = new SDLVideo (0);
+	// [rc4l] The dedicated server has no renderer and must never try to open a window.
+	I_FatalError ("This is a server-only build; it cannot initialize graphics");
 #endif
 	if (Video == NULL)
 		I_FatalError ("Failed to initialize display");

@@ -38,6 +38,7 @@
 **
 */
 
+#include "features/hwrender/hwrender_init.h"
 #include "gl/system/gl_system.h"
 #include "p_local.h"
 #include "p_lnspec.h"
@@ -247,6 +248,28 @@ void GLWall::RenderWall(int textured, float * color2, ADynamicLight * light)
 
 	gl_RenderState.Apply();
 
+	// [rc4l] Core cannot draw in immediate mode, so the wall is queued for the ported path instead.
+	// Split edges, glow attributes and per-side colour are not carried over yet.
+	if (hwrender::IsCoreProfile())
+	{
+		// [rc4l] RenderWall is called from eight sites: the textured pass, untextured passes for
+		// mirrors and stencils, and per-light passes. Only bit 0 means "sample the texture", so
+		// emitting for the others overdrew good geometry with untextured quads -- which is why the
+		// lower wall sections came out black.
+		if (gltexture != NULL && (textured & 1))
+		{
+			const hwrender::SceneVertex corners[4] =
+			{
+				{ glseg.x1, zbottom[0], glseg.y1, tcs[0].u, tcs[0].v },
+				{ glseg.x1, ztop[0],    glseg.y1, tcs[1].u, tcs[1].v },
+				{ glseg.x2, ztop[1],    glseg.y2, tcs[2].u, tcs[2].v },
+				{ glseg.x2, zbottom[1], glseg.y2, tcs[3].u, tcs[3].v },
+			};
+			hwrender::QueueSceneQuad(gltexture->tex, corners, 0xffffffff);
+		}
+		return;
+	}
+
 	// the rest of the code is identical for textured rendering and lights
 
 	glBegin(GL_TRIANGLE_FAN);
@@ -399,7 +422,7 @@ void GLWall::RenderMirrorSurface()
 		glDepthMask(true);
 		glPolygonOffset(0.0f, 0.0f);
 		glDisable(GL_POLYGON_OFFSET_FILL);
-		gl_RenderState.SetTextureMode(TM_MODULATE);
+		gl_RenderState.SetTextureMode(LEGACY_TM_MODULATE);
 		gl_RenderState.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	}
 }

@@ -39,6 +39,7 @@
 **
 */
 
+#include "features/hwrender/hwrender_init.h"
 #include "gl/system/gl_system.h"
 #include "templates.h"
 #include "m_crc32.h"
@@ -110,7 +111,9 @@ void FHardwareTexture::LoadImage(unsigned char * buffer,int w, int h, unsigned i
 
 		// The texture must at least be initialized if no data is present.
 		mipmap=false;
-		glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, false);
+		// [rc4l] GL_GENERATE_MIPMAP as a texture parameter was removed in core profile; setting it
+		// there is an INVALID_ENUM on every bind. Core generates mipmaps explicitly after upload.
+		if (!hwrender::IsCoreProfile()) glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, false);
 		buffer=(unsigned char *)calloc(4,rw * (rh+1));
 		deletebuffer=true;
 		//texheight=-h;	
@@ -120,7 +123,8 @@ void FHardwareTexture::LoadImage(unsigned char * buffer,int w, int h, unsigned i
 		rw = GetTexDimension (w);
 		rh = GetTexDimension (h);
 
-		glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, (mipmap && use_mipmapping && !forcenofiltering));
+		const bool wantMipmap = (mipmap && use_mipmapping && !forcenofiltering);
+		if (!hwrender::IsCoreProfile()) glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, wantMipmap);
 
 		if (rw == w && rh == h)
 		{
@@ -159,6 +163,9 @@ void FHardwareTexture::LoadImage(unsigned char * buffer,int w, int h, unsigned i
 		}
 	}
 	glTexImage2D(GL_TEXTURE_2D, 0, texformat, rw, rh, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+	// [rc4l] Core's replacement would be glGenerateMipmap here, but our legacy GLEW loader does not
+	// resolve it (the ported backend has its own loader that does). Textures are therefore unmipmapped
+	// under core for now, which costs quality at distance but not correctness.
 
 	if (deletebuffer) free(buffer);
 

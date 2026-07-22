@@ -284,6 +284,12 @@ void gl_LoadExtensions()
 		glBindBuffer			= (PFNGLBINDBUFFERPROC)myGetProcAddress("glBindBuffer");
 		glDeleteBuffers			= (PFNGLDELETEBUFFERSPROC)myGetProcAddress("glDeleteBuffers");
 		glGenBuffers			= (PFNGLGENBUFFERSPROC)myGetProcAddress("glGenBuffers");
+		// [rc4l] VAO + core shader-status entry points for the hwrender backend (inert until Phase 1).
+		glGenVertexArrays		= (PFNGLGENVERTEXARRAYSPROC)myGetProcAddress("glGenVertexArrays");
+		glBindVertexArray		= (PFNGLBINDVERTEXARRAYPROC)myGetProcAddress("glBindVertexArray");
+		glDeleteVertexArrays	= (PFNGLDELETEVERTEXARRAYSPROC)myGetProcAddress("glDeleteVertexArrays");
+		glGetShaderiv			= (PFNGLGETSHADERIVPROC)myGetProcAddress("glGetShaderiv");
+		glGetProgramiv			= (PFNGLGETPROGRAMIVPROC)myGetProcAddress("glGetProgramiv");
 		glBufferData			= (PFNGLBUFFERDATAPROC)myGetProcAddress("glBufferData");
 		glBufferSubData			= (PFNGLBUFFERSUBDATAPROC)myGetProcAddress("glBufferSubData");
 		glMapBuffer				= (PFNGLMAPBUFFERPROC)myGetProcAddress("glMapBuffer");
@@ -405,7 +411,7 @@ void gl_SetTextureMode(int type)
 {
 	static float white[] = {1.f,1.f,1.f,1.f};
 
-	if (type == TM_MASK)
+	if (type == LEGACY_TM_MASK)
 	{
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
 		glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB, GL_REPLACE);
@@ -418,7 +424,7 @@ void gl_SetTextureMode(int type)
 		glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND0_ALPHA, GL_SRC_ALPHA);
 		glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND1_ALPHA, GL_SRC_ALPHA);
 	}
-	else if (type == TM_OPAQUE)
+	else if (type == LEGACY_TM_OPAQUE)
 	{
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
 		glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB, GL_MODULATE);
@@ -431,7 +437,7 @@ void gl_SetTextureMode(int type)
 		glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_ALPHA, GL_PRIMARY_COLOR);
 		glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND0_ALPHA, GL_SRC_ALPHA);
 	}
-	else if (type == TM_INVERT)
+	else if (type == LEGACY_TM_INVERT)
 	{
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
 		glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB, GL_MODULATE);
@@ -446,7 +452,7 @@ void gl_SetTextureMode(int type)
 		glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND0_ALPHA, GL_SRC_ALPHA);
 		glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND1_ALPHA, GL_SRC_ALPHA);
 	}
-	else if (type == TM_INVERTOPAQUE)
+	else if (type == LEGACY_TM_INVERTOPAQUE)
 	{
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
 		glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB, GL_MODULATE);
@@ -459,7 +465,7 @@ void gl_SetTextureMode(int type)
 		glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_ALPHA, GL_PRIMARY_COLOR);
 		glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND0_ALPHA, GL_SRC_ALPHA);
 	}
-	else // if (type == TM_MODULATE)
+	else // if (type == LEGACY_TM_MODULATE)
 	{
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 	}

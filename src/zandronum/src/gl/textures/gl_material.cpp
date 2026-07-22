@@ -58,6 +58,10 @@
 #include "gl/textures/gl_translate.h"
 #include "gl/textures/gl_bitmap.h"
 #include "gl/textures/gl_material.h"
+// [rc4l] hwrender adapter needs the ported backend's hardware-texture wrapper and layer struct.
+#include "features/hwrender/backend/hwrenderer/data/zx_materiallayer.h"
+#include "features/hwrender/backend/common/hw_ihwtexture.h"
+#include "features/hwrender/backend/gl/gl_hwtexture.h" // [rc4l] path-qualified: an unqualified include resolves to our own gl/textures/gl_hwtexture.h
 #include "gl/shaders/gl_shader.h"
 
 EXTERN_CVAR(Bool, gl_render_precise)
@@ -1124,3 +1128,45 @@ CCMD(textureinfo)
 	Printf(PRINT_LOG, "%d system textures, %d hardware textures, %d pixels\n", cntt, cnth, pix);
 }
 
+
+//===========================================================================
+//
+// [rc4l] hwrender adapter: hand the ported backend a hardware texture for a
+// material layer, reusing Zandronum's own upload path (see issue #4).
+//
+//===========================================================================
+// [rc4l] See gl_material.h; mirrors GetLayer's binding sequence but yields the raw GL name.
+unsigned int FMaterial::GetBaseGLHandle(int translation)
+{
+	if (mBaseLayer == NULL) return 0;
+	const FHardwareTexture *hw = mBaseLayer->Bind(0, CM_DEFAULT, 0, translation, NULL, 0);
+	if (hw == NULL) return 0;
+	return const_cast<FHardwareTexture *>(hw)->Bind(0, CM_DEFAULT, translation);
+}
+
+IHardwareTexture *FMaterial::GetLayer(int i, int translation, MaterialLayerInfo **pLayer)
+{
+	FTexture *layerTex = (i == 0) ? tex : mTextureLayers[i - 1].texture;
+	FGLTexture *gltex = (i == 0) ? mBaseLayer : (layerTex ? layerTex->gl_info.SystemTexture : NULL);
+
+	if (pLayer != NULL)
+	{
+		if (mLayerInfo == NULL) mLayerInfo = new MaterialLayerInfo;
+		mLayerInfo->layerTexture = layerTex;
+		mLayerInfo->scaleFlags = 0;
+		*pLayer = mLayerInfo;
+	}
+
+	if (gltex == NULL) return NULL;
+
+	// Upload through our own path, then adopt the resulting GL name.
+	const FHardwareTexture *ours = gltex->Bind(0, CM_DEFAULT, 0, translation, NULL, 0);
+	if (ours == NULL) return NULL;
+	unsigned int texid = const_cast<FHardwareTexture *>(ours)->Bind(0, CM_DEFAULT, translation);
+	if (texid == 0) return NULL;
+
+	if (mAdoptedLayers.Size() <= (unsigned)i) mAdoptedLayers.Resize(i + 1);
+	if (mAdoptedLayers[i] == NULL) mAdoptedLayers[i] = new OpenGLRenderer::FHardwareTexture();
+	static_cast<OpenGLRenderer::FHardwareTexture *>(mAdoptedLayers[i])->AdoptTextureHandle(texid);
+	return mAdoptedLayers[i];
+}

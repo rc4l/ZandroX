@@ -8,7 +8,7 @@
 
 struct particle_t;
 class FCanvasTexture;
-class FFlatVertexBuffer;
+class LegacyFlatVertexBuffer;
 class OpenGLFrameBuffer;
 struct FDrawInfo;
 struct pspdef_t;
@@ -68,7 +68,7 @@ public:
 	FVector2 mViewVector;
 	FVector3 mCameraPos;
 
-	FFlatVertexBuffer *mVBO;
+	LegacyFlatVertexBuffer *mVBO;
 
 
 	FGLRenderer(OpenGLFrameBuffer *fb);
@@ -82,6 +82,11 @@ public:
 	void RenderView(player_t *player);
 	void SetCameraPos(fixed_t viewx, fixed_t viewy, fixed_t viewz, angle_t viewangle);
 	void SetupView(fixed_t viewx, fixed_t viewy, fixed_t viewz, angle_t viewangle, bool mirror, bool planemirror);
+
+	// [rc4l] mCurrentFoV already exists above; these two complete what the ported path needs to
+	// rebuild the projection matrix, since core has no gluPerspective.
+	float mCurrentRatio = 1.0f;
+	float mCurrentFovRatio = 1.0f;
 
 	void Initialize();
 

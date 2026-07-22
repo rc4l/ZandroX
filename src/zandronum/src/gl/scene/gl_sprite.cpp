@@ -37,6 +37,7 @@
 **---------------------------------------------------------------------------
 **
 */
+#include "features/hwrender/hwrender_init.h"
 #include "gl/system/gl_system.h"
 #include "p_local.h"
 #include "p_effect.h"
@@ -289,6 +290,24 @@ void GLSprite::Draw(int pass)
 			v4 = Vector(x2, z2, y2);
 		}
 
+		// [rc4l] Core cannot draw in immediate mode; the strip is reordered into a fan and queued.
+		// Untextured particles are skipped for now -- they have no texture to sample.
+		if (hwrender::IsCoreProfile())
+		{
+			if (gltexture != NULL)
+			{
+				const hwrender::SceneVertex corners[4] =
+				{
+					{ v1[0], v1[1], v1[2], ul, vt },
+					{ v2[0], v2[1], v2[2], ur, vt },
+					{ v4[0], v4[1], v4[2], ur, vb },
+					{ v3[0], v3[1], v3[2], ul, vb },
+				};
+				hwrender::QueueSceneFan(gltexture->tex, corners, 4, 0xffffffff, true);
+			}
+		}
+		else
+		{
 		glBegin(GL_TRIANGLE_STRIP);
 		if (gltexture)
 		{
@@ -306,6 +325,7 @@ void GLSprite::Draw(int pass)
 		}
 
 		glEnd();
+		}
 
 		if (foglayer)
 		{
@@ -345,7 +365,7 @@ void GLSprite::Draw(int pass)
 		gl_RenderState.EnableBrightmap(true);
 		gl_RenderState.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		gl_RenderState.BlendEquation(GL_FUNC_ADD);
-		gl_RenderState.SetTextureMode(TM_MODULATE);
+		gl_RenderState.SetTextureMode(LEGACY_TM_MODULATE);
 
 		// [BB] Restore the alpha test after drawing a smooth particle.
 		if (hw_styleflags == STYLEHW_NoAlphaTest)

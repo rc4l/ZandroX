@@ -38,6 +38,7 @@
 **
 */
 
+#include "features/hwrender/hwrender_init.h"
 #include "gl/system/gl_system.h"
 #include "gi.h"
 #include "m_png.h"
@@ -262,6 +263,11 @@ void FGLRenderer::SetCameraPos(fixed_t viewx, fixed_t viewy, fixed_t viewz, angl
 
 void FGLRenderer::SetProjection(float fov, float ratio, float fovratio, float eyeShift) // [BB] Added eyeShift from GZ3Doom.
 {
+	// [rc4l] Kept so the ported path can rebuild an equivalent projection matrix.
+	mCurrentFoV = fov;
+	mCurrentRatio = ratio;
+	mCurrentFovRatio = fovratio;
+
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 
@@ -297,6 +303,15 @@ void FGLRenderer::SetProjection(float fov, float ratio, float fovratio, float ey
 
 void FGLRenderer::SetViewMatrix(bool mirror, bool planemirror)
 {
+	// [rc4l] Core has no fixed-function matrices, so the ported path rebuilds them from the same
+	// state. Hooked here rather than in SetupView because the main view calls this directly.
+	if (hwrender::IsCoreProfile())
+	{
+		hwrender::SetSceneCamera(mAngles.Roll, mAngles.Pitch, mAngles.Yaw,
+			mCameraPos.X, mCameraPos.Y, mCameraPos.Z, mirror, planemirror,
+			mCurrentFoV, mCurrentRatio, mCurrentFovRatio);
+	}
+
 	if (gl.shadermodel >= 4)
 	{
 		glActiveTexture(GL_TEXTURE7);
@@ -432,7 +447,7 @@ void FGLRenderer::RenderScene(int recursion)
 	if (!gl_texture) 
 	{
 		gl_RenderState.EnableTexture(true);
-		gl_RenderState.SetTextureMode(TM_MASK);
+		gl_RenderState.SetTextureMode(LEGACY_TM_MASK);
 	}
 	if (pass == GLPASS_BASE) pass = GLPASS_BASE_MASKED;
 	gl_RenderState.AlphaFunc(GL_GEQUAL,gl_mask_threshold);
@@ -461,12 +476,12 @@ void FGLRenderer::RenderScene(int recursion)
 
 		// Part 2: masked geometry. This is set up so that only pixels with alpha>0.5 will show
 		// This creates a blank surface that only fills the nontransparent parts of the texture
-		gl_RenderState.SetTextureMode(TM_MASK);
+		gl_RenderState.SetTextureMode(LEGACY_TM_MASK);
 		gl_RenderState.EnableBrightmap(true);
 		gl_drawinfo->drawlists[GLDL_LIGHTBRIGHT].Draw(GLPASS_BASE_MASKED);
 		gl_drawinfo->drawlists[GLDL_LIGHTMASKED].Draw(GLPASS_BASE_MASKED);
 		gl_RenderState.EnableBrightmap(false);
-		gl_RenderState.SetTextureMode(TM_MODULATE);
+		gl_RenderState.SetTextureMode(LEGACY_TM_MODULATE);
 
 
 		// second pass: draw lights (on fogged surfaces they are added to the textures!)
@@ -535,7 +550,7 @@ void FGLRenderer::RenderScene(int recursion)
 		gl_drawinfo->drawlists[i].Draw(GLPASS_DECALS);
 	}
 
-	gl_RenderState.SetTextureMode(TM_MODULATE);
+	gl_RenderState.SetTextureMode(LEGACY_TM_MODULATE);
 
 	glDepthMask(true);
 

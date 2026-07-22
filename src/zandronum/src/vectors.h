@@ -288,6 +288,9 @@ struct TVector2
 template<class vec_t>
 struct TVector3
 {
+	// [rc4l] UZDoom's accessor for the horizontal components; their 2D drawer transforms in 2D.
+	TVector2<vec_t> XY() const { return TVector2<vec_t>(X, Y); }
+
 	typedef TVector2<vec_t> Vector2;
 
 	vec_t X, Y, Z;
@@ -546,6 +549,36 @@ struct TVector3
 template<class vec_t>
 struct TMatrix3x3
 {
+	// [rc4l] 2D affine helpers UZDoom's ported 2D drawer uses; same construction as theirs.
+	static TMatrix3x3 Rotate2D(double degrees)
+	{
+		double c = cos(degrees * M_PI / 180.0);
+		double s = sin(degrees * M_PI / 180.0);
+		TMatrix3x3 ret;
+		ret.Cells[0][0] = vec_t(c); ret.Cells[0][1] = vec_t(-s); ret.Cells[0][2] = 0;
+		ret.Cells[1][0] = vec_t(s); ret.Cells[1][1] = vec_t( c); ret.Cells[1][2] = 0;
+		ret.Cells[2][0] = 0;        ret.Cells[2][1] = 0;         ret.Cells[2][2] = 1;
+		return ret;
+	}
+
+	static TMatrix3x3 Scale2D(TVector2<vec_t> scaleVec)
+	{
+		TMatrix3x3 ret;
+		ret.Cells[0][0] = scaleVec.X; ret.Cells[0][1] = 0;          ret.Cells[0][2] = 0;
+		ret.Cells[1][0] = 0;          ret.Cells[1][1] = scaleVec.Y; ret.Cells[1][2] = 0;
+		ret.Cells[2][0] = 0;          ret.Cells[2][1] = 0;          ret.Cells[2][2] = 1;
+		return ret;
+	}
+
+	static TMatrix3x3 Translate2D(TVector2<vec_t> translateVec)
+	{
+		TMatrix3x3 ret;
+		ret.Cells[0][0] = 1; ret.Cells[0][1] = 0; ret.Cells[0][2] = translateVec.X;
+		ret.Cells[1][0] = 0; ret.Cells[1][1] = 1; ret.Cells[1][2] = translateVec.Y;
+		ret.Cells[2][0] = 0; ret.Cells[2][1] = 0; ret.Cells[2][2] = 1;
+		return ret;
+	}
+
 	typedef TVector3<vec_t> Vector3;
 
 	vec_t Cells[3][3];
@@ -748,6 +781,9 @@ Outside comments: A faster version with only 10 (not 24) multiplies.
 template<class vec_t>
 struct TAngle
 {
+	// [rc4l] UZDoom's accessor name for the angle in radians.
+	double Radians() const { return Degrees * (3.14159265358979323846 / 180.0); }
+
 	vec_t Degrees;
 
 	TAngle ()
@@ -1226,10 +1262,61 @@ inline TMatrix3x3<T>::TMatrix3x3(const TVector3<T> &axis, TAngle<T> degrees)
 }
 
 
+// [rc4l] Minimal 4-component vector added for the ported hwrender backend, which stores shader uniform data (e.g. StreamData::uDynLightColor) as FVector4.
+template<class vec_t>
+struct TVector4
+{
+	vec_t X, Y, Z, W;
+
+	TVector4() = default;
+
+	TVector4(vec_t a, vec_t b, vec_t c, vec_t d)
+		: X(a), Y(b), Z(c), W(d)
+	{
+	}
+
+	void Zero()
+	{
+		X = Y = Z = W = 0;
+	}
+
+	void Init(vec_t a, vec_t b, vec_t c, vec_t d)
+	{
+		X = a; Y = b; Z = c; W = d;
+	}
+
+	// [rc4l] Alias of Init(); the ported backend calls both spellings.
+	void Set(vec_t a, vec_t b, vec_t c, vec_t d)
+	{
+		Init(a, b, c, d);
+	}
+
+	bool operator== (const TVector4 &other) const
+	{
+		return X == other.X && Y == other.Y && Z == other.Z && W == other.W;
+	}
+
+	bool operator!= (const TVector4 &other) const
+	{
+		return !(*this == other);
+	}
+};
+
+// [rc4l] Double-precision aliases used by the ported hwrender backend.
+typedef TVector2<double>	DVector2;
+typedef TVector3<double>	DVector3;
 typedef TVector2<float>		FVector2;
 typedef TVector3<float>		FVector3;
+typedef TVector4<float>		FVector4;
 typedef TRotator<float>		FRotator;
 typedef TMatrix3x3<float>	FMatrix3x3;
 typedef TAngle<float>		FAngle;
+
+// [rc4l] UZDoom uses double-precision matrix/angle types where we use float ones.
+typedef TMatrix3x3<double> DMatrix3x3;
+typedef TAngle<double> DAngle;
+
+// [rc4l] UZDoom's zero-angle constant.
+static const DAngle nullAngle = DAngle();
 
 #endif

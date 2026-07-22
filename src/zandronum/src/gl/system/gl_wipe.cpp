@@ -277,7 +277,7 @@ bool OpenGLFrameBuffer::Wiper_Crossfade::Run(int ticks, OpenGLFrameBuffer *fb)
 	float ur = fb->GetWidth() / FHardwareTexture::GetTexDimension(fb->GetWidth());
 	float vb = fb->GetHeight() / FHardwareTexture::GetTexDimension(fb->GetHeight());
 
-	gl_RenderState.SetTextureMode(TM_OPAQUE);
+	gl_RenderState.SetTextureMode(LEGACY_TM_OPAQUE);
 	gl_RenderState.EnableAlphaTest(false);
 	gl_RenderState.Apply();
 	fb->wipestartscreen->Bind(0, CM_DEFAULT);
@@ -306,7 +306,7 @@ bool OpenGLFrameBuffer::Wiper_Crossfade::Run(int ticks, OpenGLFrameBuffer *fb)
 	glVertex2i(fb->Width, fb->Height);
 	glEnd();
 	gl_RenderState.EnableAlphaTest(true);
-	gl_RenderState.SetTextureMode(TM_MODULATE);
+	gl_RenderState.SetTextureMode(LEGACY_TM_MODULATE);
 
 	return Clock >= 32;
 }
@@ -345,7 +345,7 @@ bool OpenGLFrameBuffer::Wiper_Melt::Run(int ticks, OpenGLFrameBuffer *fb)
 	float vb = fb->GetHeight() / FHardwareTexture::GetTexDimension(fb->GetHeight());
 
 	// Draw the new screen on the bottom.
-	gl_RenderState.SetTextureMode(TM_OPAQUE);
+	gl_RenderState.SetTextureMode(LEGACY_TM_OPAQUE);
 	gl_RenderState.Apply();
 	fb->wipeendscreen->Bind(0, CM_DEFAULT);
 	glColor4f(1.f, 1.f, 1.f, 1.f);
@@ -413,7 +413,7 @@ bool OpenGLFrameBuffer::Wiper_Melt::Run(int ticks, OpenGLFrameBuffer *fb)
 			}
 		}
 	}
-	gl_RenderState.SetTextureMode(TM_MODULATE);
+	gl_RenderState.SetTextureMode(LEGACY_TM_MODULATE);
 	return done;
 }
 
@@ -489,7 +489,7 @@ bool OpenGLFrameBuffer::Wiper_Burn::Run(int ticks, OpenGLFrameBuffer *fb)
 
 
 	// Put the initial screen back to the buffer.
-	gl_RenderState.SetTextureMode(TM_OPAQUE);
+	gl_RenderState.SetTextureMode(LEGACY_TM_OPAQUE);
 	gl_RenderState.EnableAlphaTest(false);
 	gl_RenderState.Apply();
 	fb->wipestartscreen->Bind(0, CM_DEFAULT);
@@ -505,7 +505,7 @@ bool OpenGLFrameBuffer::Wiper_Burn::Run(int ticks, OpenGLFrameBuffer *fb)
 	glVertex2i(fb->Width, fb->Height);
 	glEnd();
 
-	gl_RenderState.SetTextureMode(TM_MODULATE);
+	gl_RenderState.SetTextureMode(LEGACY_TM_MODULATE);
 	gl_RenderState.Apply(true);
 	glActiveTexture(GL_TEXTURE1);
 	glEnable(GL_TEXTURE_2D);

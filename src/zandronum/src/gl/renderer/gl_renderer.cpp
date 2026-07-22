@@ -105,7 +105,7 @@ void FGLRenderer::Initialize()
 	mirrortexture = FTexture::CreateTexture(Wads.GetNumForFullName("glstuff/mirror.png"), FTexture::TEX_MiscPatch);
 	gllight = FTexture::CreateTexture(Wads.GetNumForFullName("glstuff/gllight.png"), FTexture::TEX_MiscPatch);
 
-	mVBO = new FFlatVertexBuffer;
+	mVBO = new LegacyFlatVertexBuffer;
 	mFBID = 0;
 	SetupLevel();
 	mShaderManager = new FShaderManager;
@@ -352,7 +352,7 @@ void FGLRenderer::DrawTexture(FTexture *img, DCanvas::DrawParms &parms)
 		u2=1.f;
 		v2=-1.f;
 		u1 = v1 = 0.f;
-		gl_RenderState.SetTextureMode(TM_OPAQUE);
+		gl_RenderState.SetTextureMode(LEGACY_TM_OPAQUE);
 	}
 	
 	if (parms.flipX)
@@ -394,7 +394,7 @@ void FGLRenderer::DrawTexture(FTexture *img, DCanvas::DrawParms &parms)
 	gl_SetRenderStyle(parms.style, !parms.masked, false);
 	if (img->bHasCanvas)
 	{
-		gl_RenderState.SetTextureMode(TM_OPAQUE);
+		gl_RenderState.SetTextureMode(LEGACY_TM_OPAQUE);
 	}
 
 	glColor4f(r, g, b, FIXED2FLOAT(parms.alpha));
@@ -414,7 +414,7 @@ void FGLRenderer::DrawTexture(FTexture *img, DCanvas::DrawParms &parms)
 
 	if (parms.colorOverlay)
 	{
-		gl_RenderState.SetTextureMode(TM_MASK);
+		gl_RenderState.SetTextureMode(LEGACY_TM_MASK);
 		gl_RenderState.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		gl_RenderState.BlendEquation(GL_FUNC_ADD);
 		gl_RenderState.Apply();
@@ -435,7 +435,7 @@ void FGLRenderer::DrawTexture(FTexture *img, DCanvas::DrawParms &parms)
 	
 	glScissor(0, 0, screen->GetWidth(), screen->GetHeight());
 	glDisable(GL_SCISSOR_TEST);
-	gl_RenderState.SetTextureMode(TM_MODULATE);
+	gl_RenderState.SetTextureMode(LEGACY_TM_MODULATE);
 	gl_RenderState.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	gl_RenderState.BlendEquation(GL_FUNC_ADD);
 }

@@ -97,7 +97,7 @@ FVertexBuffer::~FVertexBuffer()
 //
 //==========================================================================
 
-FFlatVertexBuffer::FFlatVertexBuffer()
+LegacyFlatVertexBuffer::LegacyFlatVertexBuffer()
 : FVertexBuffer()
 {
 	if (!(gl.flags&RFL_VBO)) 
@@ -111,7 +111,7 @@ FFlatVertexBuffer::FFlatVertexBuffer()
 	map = NULL;
 }
 
-FFlatVertexBuffer::~FFlatVertexBuffer()
+LegacyFlatVertexBuffer::~LegacyFlatVertexBuffer()
 {
 	UnmapVBO();
 }
@@ -154,7 +154,7 @@ static F3DFloor *Find3DFloor(sector_t *target, sector_t *model)
 //
 //==========================================================================
 
-int FFlatVertexBuffer::CreateSubsectorVertices(subsector_t *sub, const secplane_t &plane, int floor)
+int LegacyFlatVertexBuffer::CreateSubsectorVertices(subsector_t *sub, const secplane_t &plane, int floor)
 {
 	int idx = vbo_shadowdata.Reserve(sub->numlines);
 	for(unsigned int k=0; k<sub->numlines; k++, idx++)
@@ -171,7 +171,7 @@ int FFlatVertexBuffer::CreateSubsectorVertices(subsector_t *sub, const secplane_
 //
 //==========================================================================
 
-int FFlatVertexBuffer::CreateSectorVertices(sector_t *sec, const secplane_t &plane, int floor)
+int LegacyFlatVertexBuffer::CreateSectorVertices(sector_t *sec, const secplane_t &plane, int floor)
 {
 	int rt = vbo_shadowdata.Size();
 	// First calculate the vertices for the sector itself
@@ -189,7 +189,7 @@ int FFlatVertexBuffer::CreateSectorVertices(sector_t *sec, const secplane_t &pla
 //
 //==========================================================================
 
-int FFlatVertexBuffer::CreateVertices(int h, sector_t *sec, const secplane_t &plane, int floor)
+int LegacyFlatVertexBuffer::CreateVertices(int h, sector_t *sec, const secplane_t &plane, int floor)
 {
 	// First calculate the vertices for the sector itself
 	sec->vboheight[h] = sec->GetPlaneTexZ(h);
@@ -235,7 +235,7 @@ int FFlatVertexBuffer::CreateVertices(int h, sector_t *sec, const secplane_t &pl
 //
 //==========================================================================
 
-void FFlatVertexBuffer::CreateFlatVBO()
+void LegacyFlatVertexBuffer::CreateFlatVBO()
 {
 	for (int h = sector_t::floor; h <= sector_t::ceiling; h++)
 	{
@@ -271,7 +271,7 @@ void FFlatVertexBuffer::CreateFlatVBO()
 //
 //==========================================================================
 
-void FFlatVertexBuffer::MapVBO()
+void LegacyFlatVertexBuffer::MapVBO()
 {
 	if (map == NULL)
 	{
@@ -287,7 +287,7 @@ void FFlatVertexBuffer::MapVBO()
 //
 //==========================================================================
 
-void FFlatVertexBuffer::UnmapVBO()
+void LegacyFlatVertexBuffer::UnmapVBO()
 {
 	if (map != NULL)
 	{
@@ -302,7 +302,7 @@ void FFlatVertexBuffer::UnmapVBO()
 //
 //==========================================================================
 
-void FFlatVertexBuffer::UpdatePlaneVertices(sector_t *sec, int plane)
+void LegacyFlatVertexBuffer::UpdatePlaneVertices(sector_t *sec, int plane)
 {
 	int startvt = sec->vboindex[plane];
 	int countvt = sec->vbocount[plane];
@@ -332,7 +332,7 @@ void FFlatVertexBuffer::UpdatePlaneVertices(sector_t *sec, int plane)
 //
 //==========================================================================
 
-void FFlatVertexBuffer::CreateVBO()
+void LegacyFlatVertexBuffer::CreateVBO()
 {
 	vbo_shadowdata.Clear();
 	if (vbo_arg > 0)
@@ -359,7 +359,7 @@ void FFlatVertexBuffer::CreateVBO()
 //
 //==========================================================================
 
-void FFlatVertexBuffer::BindVBO()
+void LegacyFlatVertexBuffer::BindVBO()
 {
 	if (vbo_arg > 0)
 	{
@@ -380,7 +380,7 @@ void FFlatVertexBuffer::BindVBO()
 //
 //==========================================================================
 
-void FFlatVertexBuffer::CheckPlanes(sector_t *sector)
+void LegacyFlatVertexBuffer::CheckPlanes(sector_t *sector)
 {
 	if (sector->GetPlaneTexZ(sector_t::ceiling) != sector->vboheight[sector_t::ceiling])
 	{
@@ -409,7 +409,7 @@ void FFlatVertexBuffer::CheckPlanes(sector_t *sector)
 //
 //==========================================================================
 
-void FFlatVertexBuffer::CheckUpdate(sector_t *sector)
+void LegacyFlatVertexBuffer::CheckUpdate(sector_t *sector)
 {
 	if (vbo_arg == 2)
 	{

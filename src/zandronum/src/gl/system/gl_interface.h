@@ -31,12 +31,14 @@ enum TexMode
 	TMF_OPAQUEBIT = 2,
 	TMF_INVERTBIT = 4,
 
-	TM_MODULATE = 0,
-	TM_MASK = TMF_MASKBIT,
-	TM_OPAQUE = TMF_OPAQUEBIT,
-	TM_INVERT = TMF_INVERTBIT,
+	// [rc4l] Prefixed LEGACY_ so UZDoom's TM_* can own the plain names globally. These belong to the
+	// fixed-function texture-mode path and go away with it in P4.
+	LEGACY_TM_MODULATE = 0,
+	LEGACY_TM_MASK = TMF_MASKBIT,
+	LEGACY_TM_OPAQUE = TMF_OPAQUEBIT,
+	LEGACY_TM_INVERT = TMF_INVERTBIT,
 	//TM_INVERTMASK = TMF_MASKBIT | TMF_INVERTBIT
-	TM_INVERTOPAQUE = TMF_INVERTBIT | TMF_OPAQUEBIT,
+	LEGACY_TM_INVERTOPAQUE = TMF_INVERTBIT | TMF_OPAQUEBIT,
 };
 
 struct RenderContext

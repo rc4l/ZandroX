@@ -37,6 +37,7 @@
 **---------------------------------------------------------------------------
 **
 */
+#include "features/hwrender/hwrender_init.h"
 #include "gl/system/gl_system.h"
 #include "sbar.h"
 #include "r_utility.h"
@@ -154,12 +155,25 @@ void FGLRenderer::DrawPSprite (player_t * player,pspdef_t *psp,fixed_t sx, fixed
 		gl_RenderState.EnableAlphaTest(false);
 	}
 	gl_RenderState.Apply();
+	// [rc4l] The weapon is in screen pixels, so it goes through the ported 2D path under core.
+	if (hwrender::IsCoreProfile())
+	{
+		if (tex != NULL)
+		{
+			// [rc4l] Lit, not flat white: the weapon takes the sector's light like the world does.
+			hwrender::Queue2DTextureLit(tex->tex, x1, y1, x2 - x1, y2 - y1,
+				fU1, fV1, fU2, fV2);
+		}
+	}
+	else
+	{
 	glBegin(GL_TRIANGLE_STRIP);
 	glTexCoord2f(fU1, fV1); glVertex2f(x1,y1);
 	glTexCoord2f(fU1, fV2); glVertex2f(x1,y2);
 	glTexCoord2f(fU2, fV1); glVertex2f(x2,y1);
 	glTexCoord2f(fU2, fV2); glVertex2f(x2,y2);
 	glEnd();
+	}
 	if (tex->GetTransparent() || OverrideShader != 0)
 	{
 		gl_RenderState.EnableAlphaTest(true);
@@ -412,7 +426,7 @@ void FGLRenderer::DrawTargeterSprites()
 	gl_RenderState.AlphaFunc(GL_GEQUAL,gl_mask_sprite_threshold);
 	gl_RenderState.BlendEquation(GL_FUNC_ADD);
 	glColor3f(1.0f,1.0f,1.0f);
-	gl_RenderState.SetTextureMode(TM_MODULATE);
+	gl_RenderState.SetTextureMode(LEGACY_TM_MODULATE);
 
 	// The Targeter's sprites are always drawn normally.
 	for (i=ps_targetcenter, psp = &player->psprites[ps_targetcenter]; i<NUMPSPRITES; i++,psp++)

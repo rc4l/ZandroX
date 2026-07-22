@@ -75,6 +75,7 @@ FGLRenderer *GLRenderer;
 
 void gl_SetupMenu();
 void gl_LoadExtensions();
+#include "features/hwrender/hwrender_init.h"
 void gl_PrintStartupLog();
 
 //==========================================================================
@@ -119,6 +120,11 @@ void OpenGLFrameBuffer::InitializeState()
 	static bool first=true;
 
 	gl_LoadExtensions();
+	// [rc4l] The ported backend needs the GL entry points, so this is the earliest safe point to start it.
+	if (hwrender::IsCoreProfile())
+	{
+		hwrender::InitPortedShaders();
+	}
 	Super::InitializeState();
 	if (first)
 	{
@@ -187,6 +193,18 @@ CVAR(Bool, gl_draw_sync, true, 0) //false, CVAR_ARCHIVE|CVAR_GLOBALCONFIG)
 
 void OpenGLFrameBuffer::Update()
 {
+	// [rc4l] The legacy renderer is immediate-mode and cannot draw in a core context, so under core
+	// the ported path owns the whole frame and the legacy draw calls below are skipped entirely.
+	if (hwrender::IsCoreProfile())
+	{
+		if (!CanUpdate()) return;
+		hwrender::RenderCoreFrame(GetWidth(), GetHeight());
+		Swap();
+		swapped = false;
+		Unlock();
+		return;
+	}
+
 	if (!CanUpdate()) 
 	{
 		GLRenderer->Flush();
@@ -430,6 +448,17 @@ void STACK_ARGS OpenGLFrameBuffer::DrawTextureV(FTexture *img, double x0, double
 
 	if (ParseDrawTextureTags(img, x0, y0, tag, tags, &parms, true))
 	{
+		// [rc4l] Under core the legacy 2D drawer cannot run, so the draw is queued for the ported path.
+		if (hwrender::IsCoreProfile())
+		{
+			// [rc4l] parms.left/top are the texture's own offsets and must be subtracted from the
+			// position. Font characters have none, which is why text looked right while the
+			// sprite-based HUD icons were placed low enough to fall off the bottom of the screen.
+			hwrender::Queue2DTexture(img, (float)(parms.x - parms.left), (float)(parms.y - parms.top),
+				(float)parms.destwidth, (float)parms.destheight,
+				MAKEARGB((BYTE)((parms.alpha * 255) >> FRACBITS), 255, 255, 255));
+			return;
+		}
 		if (GLRenderer != NULL) GLRenderer->DrawTexture(img, parms);
 	}
 }

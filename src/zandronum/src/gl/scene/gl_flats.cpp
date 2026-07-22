@@ -38,6 +38,8 @@
 **
 */
 
+#include "features/hwrender/hwrender_init.h"
+#include <vector>
 #include "gl/system/gl_system.h"
 #include "a_sharedglobal.h"
 #include "r_defs.h"
@@ -238,6 +240,31 @@ bool GLFlat::SetupSubsectorLights(bool lightsapplied, subsector_t * sub)
 
 void GLFlat::DrawSubsector(subsector_t * sub)
 {
+	// [rc4l] Core cannot draw in immediate mode, so the subsector fan is queued for the ported path.
+	if (hwrender::IsCoreProfile())
+	{
+		if (gltexture != NULL && sub->numlines >= 3)
+		{
+			std::vector<hwrender::SceneVertex> verts;
+			verts.reserve(sub->numlines);
+			for (unsigned int k = 0; k < sub->numlines; k++)
+			{
+				vertex_t *vt = sub->firstline[k].v1;
+				hwrender::SceneVertex v;
+				v.x = vt->fx;
+				v.y = plane.plane.ZatPoint(vt->fx, vt->fy) + dz;
+				v.z = vt->fy;
+				v.u = vt->fx / 64.f;
+				v.v = -vt->fy / 64.f;
+				verts.push_back(v);
+			}
+			hwrender::QueueSceneFan(gltexture->tex, verts.data(), (int)verts.size(), 0xffffffff);
+		}
+		flatvertices += sub->numlines;
+		flatprimitives++;
+		return;
+	}
+
 	glBegin(GL_TRIANGLE_FAN);
 
 	for(unsigned int k=0; k<sub->numlines; k++)
@@ -272,7 +299,9 @@ void GLFlat::DrawSubsectors(int pass, bool istrans)
 	}
 	else
 	{
-		if (vboindex >= 0)
+		// [rc4l] The VBO path binds vertices through fixed-function pointers, so under core we take
+		// the per-subsector route and let DrawSubsector queue each fan.
+		if (vboindex >= 0 && !hwrender::IsCoreProfile())
 		{
 			//glColor3f( 1.f,.5f,.5f);
 			int index = vboindex;
