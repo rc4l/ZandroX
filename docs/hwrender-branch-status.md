@@ -1,70 +1,52 @@
 # hwrender port — branch status (`feature/hwrender-port`)
 
 Honest state of the modern GL/Vulkan renderer port on this branch. Companion to
-`docs/hwrender-portability-scope.md` (the scoping/architecture) and `docs/hwrender-PLAN.md` (the
-staged execution plan). **This branch is WIP and must not be merged** — it is the foundation and the
-vendored source, not a working modern renderer yet.
+`docs/hwrender-portability-scope.md` (scoping/architecture), `docs/hwrender-integration-plan.md`
+(the staged integration), and `docs/hwrender-PLAN.md` (the prior-attempt log this branch mines).
+**WIP — do not merge.**
 
-## Done and verified (tests green, 100% coverage gate)
+## Where the code came from
 
-| Piece | What | Verification |
-|---|---|---|
-| `features/hwrender/computation/vertexconvert_compute` | The `fixed_t` boundary: raw 64-bit fixed → float, safe past ±32k map units | 5 tests incl. a past-INT32_MAX regression guard; 100% cov |
-| `features/hwrender/computation/glcontext_compute` | Core (4.1→4.0→3.3) / compat (3.0→2.1) context request chain (plan P2) | 3 tests; 100% cov |
-| `features/hwrender/computation/backendselect_compute` | `vid_hwrender` → backend, with clamp/fallback/restart rules shared by menu + init | 5 tests; 100% cov |
+The prior attempt (`archive/hwrender-port` in the sibling clone, 79 commits, reached mid-P3 with
+MAP01 rendering through a core context) was 117 commits stale and **predates the `fixed_t` 64-bit
+widening**. This branch transplanted it onto current `main` via per-file 3-way merges and
+reconciled it with the widening and with this branch's own foundations. The verbatim UZDoom vendor
+(`rendering/`, `ZVulkan/`, pinned `7bfbf61`) is kept as the re-pull reference; the build compiles the
+archive's *adapted* copy at `features/hwrender/backend/`.
 
-All 124 tests pass (`cmake --build build-tests && ctest`); the coverage gate reports 100% on every
-new `computation/` unit. Baseline before this branch was 111 tests.
+## Compiles and passes (verified this session)
 
-## Done, vendored verbatim (compiles into nothing yet — dormant)
+- **Full engine build green** (`mac_compile.sh` exit 0, app + pk3): the ported UZDoom GL backend +
+  shims + glue, the 2D drawer, the legacy-scene capture hooks, **native SDL2** (sdl12-compat no
+  longer linked; `sdlvideo.cpp`/`SDLMain.m` deleted), and the core-context request path
+  (`vid_hwrender` → `zx::ResolveBackend` → `ComputeGLContextRequests`).
+- **184/184 tests green**, 100% coverage gate on all `computation/` units (13 units: the archive's
+  ten + this branch's 64-bit-safe `vertexconvert`, `glcontext`, `backendselect` — the archive's
+  32-bit versions of the latter two were superseded, not merged).
+- **`fixed_t` reconciliation:** the strong `zx::Fixed` type caught upstream's stale
+  `typedef int32_t fixed_t` in the backend shim at compile time (backend has zero `fixed_t`
+  consumers — pure collision, now defers to `basictypes.h`); the `textures.h` conflict was resolved
+  keeping the fixed64 casts; every applied hunk audited for `FRACBITS`/narrowing patterns.
+- **pk3 verified:** 30 `shaders/hwrender/` lumps + the OpenGL Options menu are in `zandronum.pk3`.
+- **Vulkan wiring:** `HAVE_VULKAN` (default OFF — CI untouched) + `add_subdirectory(ZVulkan)` + link;
+  `mac_compile.sh` auto-detects the MoltenVK/vulkan-headers/vulkan-loader brew kegs and opts in,
+  or warns and builds without. `vid_hwrender 2` resolves to core GL until a Vulkan device exists.
 
-| Piece | Source | Notes |
-|---|---|---|
-| `src/zandronum/rendering/` | UZDoom `common/rendering/` @ `7bfbf61` (149 files) | GL + GLES + Vulkan + hwrenderer backend. Zero game/ZScript coupling. `rendering/UPSTREAM.md` |
-| `src/zandronum/ZVulkan/` | UZDoom `libraries/ZVulkan` @ `7bfbf61` (159 files) | Self-contained: volk + vk_mem_alloc + glslang. No system Vulkan SDK. `ZVulkan/UPSTREAM.md` |
+## NOT verified (the honest gap)
 
-Not yet added to any CMake source list — bringing them up (the P1 adaptation surface: `zx_video`,
-`zx_texbridge`, the filesystem/printf shims, etc.) is the next large step and is where the plan's P1
-effort actually lives.
+- **Runtime.** Nothing on this branch has been run. The archive attempt rendered MAP01 through the
+  core path at ~25% A/B difference with known defects (sprite slice, 2D gaps — see the PLAN log);
+  this branch carries that code but its behaviour on the 64-bit base is unconfirmed. The Zandronum
+  MCP is registered for this project but connects next session — first action then: launch MAP01
+  under `vid_hwrender 0` (legacy must be unregressed, especially SDL2 input/video), then `1`, and
+  A/B both against the pre-port captures (`tools/ab_render.py`).
+- **Keyboard/mouse input** under native SDL2 (scancode path) needs a human at the keyboard.
+- The Vulkan *backend* (`rendering/vulkan`) is not compiled — that is plan P5, behind the same seam;
+  ZVulkan-the-library is the adjacency this branch wires.
 
-## Menu changes (see build note below before trusting)
+## Next actions, in order
 
-- `vid_hwrender` cvar (`sdl/hardware.cpp`), archived, restart-only, **default 0 so behaviour is
-  unchanged** until the backend is wired.
-- `menudef.txt`: a new `OpenGLOptions` submenu (linked from Display Options) that also gives the
-  already-working GL cvars (`gl_render_precise`, `gl_seamless`, `gl_mirror_envmap`,
-  `gl_plane_reflection`, `r_mirror_recursions`) a menu home they previously lacked, plus the
-  `RendererBackends` selector. Core-GL/Vulkan entries are labelled experimental.
-
-## What is NOT done (the honest gap)
-
-The renderer is **not** updated at runtime yet. Remaining, in plan order:
-
-1. **P1 finish** — wire the vendored backend into the build and stand up the adapters so it compiles
-   live but dormant (the bulk of the integration work).
-2. **P2** — SDL 1.2 → SDL2 migration for the core/Vulkan context (`glcontext_compute` is ready).
-3. **P3** — `scene_bridge`: retarget our fixed-point BSP walker to emit into the vendored
-   `FRenderState` (this is where `vertexconvert_compute` gets used for real).
-4. **P4** — delete the legacy fixed-function path.
-5. **P5** — bring up Vulkan behind the same seam.
-6. **Menus** — hook `Dim`/`FlatFill` under the new backend (§9), add the borderless tri-state (§10).
-
-Runtime A/B verification (MCP `launch_instance` → `screenshot`) has **not** been run on this branch;
-nothing draws through the ported path here yet.
-
-## Build note
-
-Both build paths pass on this branch:
-
-- `build-tests` (GoogleTest): **124 tests green, 100% coverage** on every new `computation/` unit.
-- Full engine build via `mac_compile.sh`: **exit 0** — `ZandroX.app` and `zandronum.pk3` rebuilt.
-  This confirms the `vid_hwrender` cvar and the `menudef.txt` OpenGL Options submenu compile, link,
-  and package. The engine also compiles the `features/hwrender/computation/*.cpp` into itself (they
-  were made C++14-clean after the build flagged an `inline constexpr` C++17 extension warning).
-
-The vendored `rendering/`/`ZVulkan` trees are **not** in the engine's source list yet, so they do
-not affect the engine build — bringing them up is the P1 step above.
-
-**Not yet done:** runtime verification. The new OpenGL Options submenu compiles and packages, but has
-not been confirmed on screen via the MCP (`launch_instance` → menu nav → `screenshot`). Nothing draws
-through the ported backend on this branch.
+1. MCP runtime A/B: `vid_hwrender 0` regression check, then `1`, on the fixed scene set.
+2. Chase the archive's known core-path defects (sprite slice; 2D `Dim`/`FlatFill` hooks) — now with
+   the F2DDrawer vendored and compiling.
+3. P4 legacy deletion once parity; P5 Vulkan device bring-up behind the seam.
