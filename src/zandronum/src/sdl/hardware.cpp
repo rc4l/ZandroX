@@ -85,6 +85,14 @@ CUSTOM_CVAR (Int, vid_renderer, 1, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 	}
 }
 
+// [rc4l] Selects the hardware renderer backend for the modern-renderer port (see
+// docs/hwrender-portability-scope.md): 0 = legacy GL (fixed-function + GLSL 1.20 on a
+// compatibility context, today's renderer), 1 = ported core GL backend, 2 = Vulkan. The context
+// profile is chosen once at startup, so this is restart-only. Defaults to 0 so behaviour is
+// unchanged until the ported backend is wired up; the value is validated by
+// zx::ResolveBackend() at init (features/hwrender/computation/backendselect_compute).
+CVAR (Int, vid_hwrender, 0, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+
 void I_ShutdownGraphics ()
 {
 	if (screen)
