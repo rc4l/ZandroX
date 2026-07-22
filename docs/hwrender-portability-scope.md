@@ -6,10 +6,14 @@ UZDoom commit closest to the renderer we ship, then work up.
 
 **Answer, up front:** UZDoom's renderer is split into a **backend half that is completely free of
 ZScript and the game model** (`src/common/rendering/**`, ~34.6k lines, measured **0** references to
-`AActor` / `sector_t` / `seg_t` / `player_t` / `VMFunction` / `PClass` / `FGameTexture`) and a
-**scene half that is welded to them** (`src/rendering/hwrenderer/scene/**`, ~19k lines). The jank is
-entirely on the scene side, and it is the side we already keep our own copy of. Tracking upstream
-GL/GLES/Vulkan work means tracking the backend half, which is genuinely portable.
+`AActor` / `sector_t` / `seg_t` / `player_t` / `VMFunction` / `PClass`) and a **scene half that is
+welded to them** (`src/rendering/hwrenderer/scene/**`, ~19k lines). The jank is entirely on the scene
+side, and it is the side we already keep our own copy of. Tracking upstream GL/GLES/Vulkan work means
+tracking the backend half, which is genuinely portable — **with one real exception: the texture
+model.** The backend is coupled to `FGameTexture`/`FMaterial`/`FHardwareTexture` (it must, to upload
+and bind), and UZDoom's texture model differs structurally from ours. That is the one seam the port
+cannot adapt-and-ignore; see §12. (Fonts, the status bar, and translations are *not* new coupling —
+they are clients of textures and the 2D path.)
 
 Method: measured against the local clone at `/Users/talhataj/repos/UZDoom` (trunk `7bfbf61`,
 `5.0.0-pre`, 2026-07-18), full history unshallowed. All counts below are `grep -rl` file counts over
@@ -394,6 +398,98 @@ That unit is the highest-risk file in the whole port and gets the fixed64 treatm
 - `ZVulkan`: `add_subdirectory(ZVulkan)` + `HAVE_VULKAN` (§8), only when Vulkan is turned on.
 - A second backend later (Metal, software-poly) = a new sibling dir under `rendering/` behind
   `irenderbackend.h`; `scene_bridge` and every `computation/` unit are untouched.
+
+## 12. Shared assets — textures, fonts, palettes, the status bar (thorough)
+
+The recurring question "is X tightly coupled to the renderer?" has one answer for **textures** and a
+different answer for everything that *uses* textures. Measured on both trees.
+
+### 12.1 Textures — the ONE real seam (corrects §3's undercount)
+
+§3 reported "`FGameTexture` in 3 files" — that was the `gl` subsystem only. Across the whole vendored
+backend the texture-model coupling is broad, because a renderer must know how to upload and bind:
+
+| symbol in `src/zandronum/rendering/` | files |
+|---|--:|
+| `FTexture` | 21 |
+| `FMaterial` | 15 |
+| `FHardwareTexture` / `IHardwareTexture` | 14 / 12 |
+| `FGameTexture` | 9 |
+
+**The mismatch is structural, not a rename.** UZDoom split the old monolithic texture into three
+layers — `FImageSource` (decodes pixels) → `FTexture` (image + processing) → `FGameTexture`
+(game-facing: scale, offsets, type, material list) — in `src/common/textures/` (which we did **not**
+vendor). Our tree still has the GZDoom-1.x **conflated** `FTexture` (base, with `FWarpTexture`,
+`FCanvasTexture` subclasses) plus its own `FMaterial` (`gl/textures/gl_material.h`). So:
+
+- **Name collision:** our `FMaterial` vs their `FMaterial` (`common/textures/hw_material.h`).
+- **Shape mismatch:** the backend calls `FGameTexture`-shaped accessors our `FTexture` lacks.
+
+**Resolution — the `zx_texbridge` adapter (plan issue #4, "tech debt"):** keep our texture manager;
+adopt our `FGLTexture`'s GL handle into their `FHardwareTexture`; and grow `FTexture` with the
+accessors the backend reads — `GetTranslucency`, `GetShaderSpeed`, `GetGlossiness`,
+`GetSpecularLevel`, `GetClampMode`, `GetTexture`, `isWarped` (enumerated in P1). Bounded, but this is
+where the integration work concentrates.
+
+**Two texture types are genuinely renderer-coupled and need attention:**
+
+- **Camera / render-to-texture** (`FCanvasTexture`: security cameras, mirrors). The renderer draws
+  *into* these. Ours is CPU-fed (`bNeedsUpdate` + `RenderView`); the backend has a hardware-canvas
+  path (`isHardwareCanvas`, render-to-FBO). These must move from our CPU path to the backend's, or
+  cameras render nothing under core.
+- **Warp** (animated water/fire surfaces). UZDoom does warp **in a shader**
+  (`hwrenderer/data/hw_shaderpatcher`); ours is a CPU `FWarpTexture` that regenerates pixels. Under
+  the ported path the CPU warp becomes redundant — the shader does it — so `FWarpTexture`'s warp is
+  dead weight, not a port blocker.
+
+### 12.2 Fonts — NO new coupling (texture client + 2D path)
+
+The vendored backend has **`FFont` in 0 files and `DrawChar` in 0 files** — it never sees a font. In
+our tree `FFont::GetChar` returns an **`FTexture`** glyph (`v_font.h:82`), drawn via
+`DrawChar`/`DrawText` → `DCanvas::DrawTexture` → the 2D path. So a font is just a producer of texture
+glyphs that flow through the **same `zx_texbridge` adapter** as any texture, then draw through the
+**same 2D path** as menus and the HUD. Nothing font-specific reaches the backend.
+
+The only version wrinkle: UZDoom's `FFont::GetChar` returns `FGameTexture*` and takes a `translation`
+argument; ours returns `FTexture*` with translation applied elsewhere. Because we **keep our own font
+system** (it is game-side, not vendored), that difference stays internal to us — the glyphs still
+just need the texture bridge. Fonts come along for free once textures + 2D work; they are not a
+separate port item.
+
+### 12.3 Palettes / translations / colormaps — shallow, shim-level
+
+Backend coupling here is thin and via types both trees already share:
+
+| symbol in `rendering/` | files | nature |
+|---|--:|---|
+| `PalEntry` | 7 | a 32-bit RGBA color — a fundamental shared type, compatible as-is |
+| `FColormap` / `FSpecialColormap` | 2 / 2 | small structs (the `palentry.h`/`renderstyle.h` shims P1 added) |
+| `FRemapTable` (sprite translations) | **0** | not in the backend — translations resolve game/2D-side to an id + texture, applied in the adapter/shader |
+
+So sector lighting, fog, colormaps and translations reach the backend as small values (a `PalEntry`,
+a colormap struct, a translation id), not as a subsystem to port. This is shim work, not a rewrite.
+
+### 12.4 Status bar — 2D path, like menus (recap of §9)
+
+`DBaseStatusBar` + the `SBARINFO` **text DSL** are pure C++ (`g_shared/sbarinfo.cpp`,
+`shared_sbar.cpp`, `st_hud.cpp`); **zero ZScript status-bar classes**. Every element draws via
+`screen->DrawTexture` — the same 2D path as menus and fonts, touching `fixed_t` in only 2 files. It
+inherits the 2D-path work (hook `Dim`/`FlatFill`, honor the full `DrawParms`) and adds no renderer
+coupling of its own.
+
+### 12.5 Summary
+
+| Asset system | Coupled to the backend? | What it needs |
+|---|---|---|
+| **Textures** | **Yes — the one real seam** | `zx_texbridge` adapter (issue #4); camera→hardware-canvas; warp becomes shader-side |
+| Fonts | No | ride the texture adapter + 2D path; keep our `FFont` |
+| Status bar / HUD | No | 2D path (hook `Dim`, `DrawParms`) — same as menus |
+| Palettes / colormaps | Shallow | `PalEntry`/`FColormap` shims (basic shared types) |
+| Translations (`FRemapTable`) | No | resolved game/2D-side to an id + texture |
+
+**Bottom line:** textures are the tightly-coupled seam and where P1 integration concentrates;
+fonts, the HUD, and translations are texture/2D-path clients that come along for free once that seam
+and the 2D drawer are in place.
 
 **Sources:** [UZDoom](https://github.com/UZDoom/UZDoom) · local clone `/Users/talhataj/repos/UZDoom`
 @ trunk `7bfbf61`. Companion: `docs/hwrender-PLAN.md` (the staged execution plan this scoping backs).
