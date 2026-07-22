@@ -14,7 +14,15 @@ reconciled it with the widening and with this branch's own foundations. The verb
 (`rendering/`, `ZVulkan/`, pinned `7bfbf61`) is kept as the re-pull reference; the build compiles the
 archive's *adapted* copy at `features/hwrender/backend/`.
 
-## Compiles and passes (verified this session)
+## Compiles and passes (verified)
+
+**CI (PR #36, all three platforms): green.** `test` (ASan/UBSan/Leak + coverage gate + clang-tidy),
+`build-linux`, `build-windows`, `build-macos` all pass on run 29954079758. Three CI rounds of
+cross-platform fixes got there: the SDL 1.2 `USE_XCURSOR` XDisplay hack replaced with SDL2 native
+color cursors (Linux), `M_PI` guarded for MSVC, an MSVC-exposed **real ODR violation** fixed by
+renaming the legacy class to `LegacyFRenderState` (two unrelated `FRenderState` classes mangled
+identically; ELF/Mach-O silently tolerated it), a C2445 conditional ambiguity in `s_sound.h`, and
+the C++20-ill-formed template-id destructor in `tarray.h`.
 
 - **Full engine build green** (`mac_compile.sh` exit 0, app + pk3): the ported UZDoom GL backend +
   shims + glue, the 2D drawer, the legacy-scene capture hooks, **native SDL2** (sdl12-compat no
