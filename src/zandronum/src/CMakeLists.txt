@@ -1586,6 +1586,12 @@ target_sources( zdoom PRIVATE features/hwrender/backend/utility/matrix.cpp
                                )
 
 # [rc4l] UZDoom's sources require C++20 (std::strong_ordering, operator<=>); the engine itself is C++14, so raise the standard only for the vendored backend, which is self-contained.
+# The flag spelling is per-compiler: MSVC rejects the GCC/clang -std form.
+if( MSVC )
+	set( ZX_BACKEND_CXX20_FLAG "/std:c++20" )
+else( MSVC )
+	set( ZX_BACKEND_CXX20_FLAG "-std=c++20" )
+endif( MSVC )
 set_source_files_properties(
 	features/hwrender/backend/utility/matrix.cpp
 	features/hwrender/backend/common/i_interface.cpp
@@ -1606,4 +1612,4 @@ set_source_files_properties(
 	features/hwrender/backend/hwrenderer/hw_draw2d.cpp
 	features/hwrender/backend/hwrenderer/data/flatvertices.cpp
 	features/hwrender/hwrender_init.cpp
-	PROPERTIES COMPILE_OPTIONS "-std=c++20" )
+	PROPERTIES COMPILE_OPTIONS "${ZX_BACKEND_CXX20_FLAG}" )
