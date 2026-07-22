@@ -113,6 +113,58 @@ seam.
 - **Determinism:** untouched by construction — the whole port is draw-only, downstream of the
   fixed-point sim; `vertexconvert` is one-way. Still smoke-test demo playback at Stage 4 and 6.
 
+## File manifest — what is added, deleted, and kept-but-retargeted
+
+Concrete paths (all under `src/zandronum/`). The important nuance: **most of our `gl/` tree is kept
+and retargeted, not deleted** — we keep the code that walks our fixed-point level data and replace
+only the immediate-mode submission layer.
+
+### ADDED
+
+| Path | What | Status |
+|---|---|---|
+| `rendering/` (150 files) | vendored UZDoom GL/GLES/Vulkan/hwrenderer backend | **on branch** |
+| `ZVulkan/` (159 files) | vendored self-contained Vulkan lib | **on branch** |
+| `src/features/hwrender/computation/` | pure tested units: `vertexconvert`, `glcontext`, `backendselect` (+ to add: `clampmode`, `texbufferpad`, `backendprereq`, matrix/frustum as needed) | **3 on branch** |
+| `src/features/hwrender/` glue | `irenderbackend.h`, `hwrender_init.cpp`, `zx_video.{h,cpp}`, `zx_texbridge.{h,cpp}`, `scene_bridge.{h,cpp}` | Stage 1/4 |
+| `wadsrc/static/shaders/hwrender/` | UZDoom's ~30 `#version 330` GLSL lumps | Stage 3 |
+| `src/sdl/hardware.cpp` (edit) | `vid_hwrender` cvar | **on branch** |
+| `wadsrc/static/menudef.txt` (edit) | OpenGL Options submenu + `RendererBackends` | **on branch** |
+
+### DELETED (Stage 6, after parity — except SDL which is Stage 2)
+
+| Path | Why |
+|---|---|
+| `wadsrc/static/shaders/glsl/` (18 lumps: `func_*.fp`, `fuzz_*.fp`, `fogboundary.fp`, …) | replaced by `shaders/hwrender/` `#version 330` set |
+| `gl/renderer/` immediate-mode `FRenderState`/`FGLRenderer` (2.3k lines, 7 files) | superseded by the vendored backend |
+| `gl/shaders/` legacy shader manager (1.7k, 4 files) | superseded by the vendored shader manager |
+| `gl_SetTextureMode` + fixed-function bits in `gl/system/gl_interface.cpp` | folded into the shader `texturemode` uniform |
+| our `FMaterial` (`gl/textures/gl_material.*`) | renamed `LegacyFMaterial` at Stage 1, deleted here; vendored `FMaterial` owns it |
+| `FWarpTexture` CPU warp (`textures/`) | warp is shader-side (`hw_shaderpatcher`) |
+| `sdl/sdlvideo.{cpp,h}`, `sdl/SDLMain.m` | software framebuffer (gone) + SDL2 supplies its own main (Stage 2) |
+| `win32/fb_d3d9.cpp`, `fb_d3d9_wipe.cpp`, `fb_ddraw.cpp` | dead D3D9/DDraw path, unreachable since `vid_renderer` pinned to 1 |
+| `sdl12-compat` build step in `mac_compile.sh` (+ Linux/Windows scripts) | native SDL2 replaces the 1.2 shim |
+| the 52 `gl.shadermodel` conditional sites across 16 files | one modern path, hard-coded |
+
+### KEPT + RETARGETED (the code that knows our fixed-point world — NOT deleted)
+
+| Path | Role after the port |
+|---|---|
+| `gl/scene/` (14k lines, 21 files — walls/flats/sprites/portals/sky BSP walker) | driven by `scene_bridge`; emits into the vendored `FRenderState` instead of immediate mode |
+| `gl/textures/` `FGLTexture` (minus `FMaterial`) | its GL handle is adopted into the backend's `FHardwareTexture` via `zx_texbridge` |
+| `gl/dynlights/` `FLightBuffer` (already Core-clean TBO code) | wired to the backend's light path |
+| `gl/models/` (model/voxel draw) | retargeted onto `FRenderState` |
+| `gl/system/gl_menu.cpp` GL cvars | kept as-is (menu already points at them) |
+| `sdl/` input/main/system (`i_input`, `i_main`, `hardware`, `sdlglvideo`) | **rewritten in place** to the SDL2 API (Stage 2), not deleted |
+| `textures/textures.*` `FTexture`/`FTextureManager` | kept; `FTexture` grows the `FGameTexture`-shaped accessors (`zx_texbridge`) |
+| whole `g_shared/` status bar, `v_font.*`, menus | untouched — 2D-path clients (§12.2/12.4) |
+
+**Rough scale:** ~+310 vendored files + ~15 new `features/hwrender/` files; ~−40 legacy files (7
+`gl/renderer` + 4 `gl/shaders` + 18 glsl + 3 win32 + 2 sdlvideo + `SDLMain.m` + `FMaterial`/warp);
+~14k lines of `gl/scene` **kept**. The net is *more* code (the vendored backend), but our
+hand-maintained surface shrinks — the immediate-mode + legacy-shader + dead-D3D9 code goes, and the
+part we keep is the scene walker we understand.
+
 ## Critical path & risk
 
 The risk is concentrated in **Stage 1** (texture bridge + `FMaterial` collision + infra shims) — it
