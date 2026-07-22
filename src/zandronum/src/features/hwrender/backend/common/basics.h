@@ -47,15 +47,12 @@
 #define MAXHEIGHT 5000
 
 //
-// fixed point, 32bit as 16.16.
+// [rc4l] Fixed point: defer to the engine's basictypes.h -- fixed_t is 64-bit 48.16 (zx::Fixed)
+// since the widening, and upstream's local 32-bit typedef here silently diverged from the sim's
+// type. The strong type caught the collision at compile time; keeping one definition keeps it
+// caught. FRACBITS/FRACUNIT/FIXED_MAX/MIN all come from basictypes.h.
 //
-#define FRACBITS						16
-#define FRACUNIT						(1<<FRACBITS)
-
-typedef int32_t							fixed_t;
-
-#define FIXED_MAX						(signed)(0x7fffffff)
-#define FIXED_MIN						(signed)(0x80000000)
+#include "basictypes.h"
 
 // the last remnants of tables.h
 #define ANGLE_90		(0x40000000)
