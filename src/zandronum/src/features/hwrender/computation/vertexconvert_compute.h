@@ -22,7 +22,7 @@ namespace zx
 
 // [rc4l] 65536 raw fixed units == 1.0 map unit (FRACBITS == 16), as a double so the divide is exact
 // across the full fixed range rather than a lossy float reciprocal.
-inline constexpr double kFixedToUnits = 1.0 / 65536.0;
+constexpr double kFixedToUnits = 1.0 / 65536.0;
 
 // [rc4l] Raw fixed_t value -> map units as double. Lossless for every value fixed_t can hold: a
 // 64-bit integer has at most 63 significant bits and IEEE double has 52, but real map coordinates

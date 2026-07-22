@@ -26,7 +26,7 @@ struct GLContextRequest
 };
 
 // [rc4l] Max attempts either chain can produce; lets the glue use a fixed C array with no allocation.
-inline constexpr int kMaxGLContextRequests = 4;
+constexpr int kMaxGLContextRequests = 4;
 
 // [rc4l] Fill `out` (capacity kMaxGLContextRequests) with the requests to try in order and return
 // the count. wantCore selects the core chain (4.1 -> 4.0 -> 3.3) or the compatibility chain
