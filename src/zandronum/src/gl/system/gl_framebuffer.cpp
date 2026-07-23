@@ -453,22 +453,10 @@ void STACK_ARGS OpenGLFrameBuffer::DrawTextureV(FTexture *img, double x0, double
 		// [rc4l] Under core the legacy 2D drawer cannot run, so the draw is queued for the ported path.
 		if (hwrender::IsCoreProfile())
 		{
-			// [rc4l] parms.left/top are the texture's own offsets and must be subtracted from the
-			// position. Font characters have none, which is why text looked right while the
-			// sprite-based HUD icons were placed low enough to fall off the bottom of the screen.
-			// The translation mapping mirrors the legacy 2D bind exactly (see GLRenderer's
-			// DrawTexture): fonts are paletted, so without their remap the glyph indices sample
-			// the raw game palette and render as rainbow garbage.
-			int translation = 0;
-			if (parms.remap != NULL && !parms.remap->Inactive)
-			{
-				GLTranslationPalette *pal = static_cast<GLTranslationPalette*>(parms.remap->GetNative());
-				if (pal) translation = -pal->GetIndex();
-			}
-			hwrender::Queue2DTexture(img, (float)(parms.x - parms.left), (float)(parms.y - parms.top),
-				(float)parms.destwidth, (float)parms.destheight,
-				MAKEARGB((BYTE)((parms.alpha * 255) >> FRACBITS), 255, 255, 255),
-				translation);
+			// [rc4l] Full DrawParms into the vendored F2DDrawer -- it owns offsets, clipping,
+			// render styles, translations and colour overlays per draw, so nothing is re-derived
+			// here (user directive: adopt UZDoom's layers, retire the bespoke queue).
+			hwrender::Add2DTexture(img, parms);
 			return;
 		}
 		if (GLRenderer != NULL) GLRenderer->DrawTexture(img, parms);

@@ -119,7 +119,7 @@ angle_t FGLRenderer::FrustumAngle()
 {
 	float tilt= fabs(mAngles.Pitch);
 
-	// If the pitch is larger than this you can look all around at a FOV of 90°
+	// If the pitch is larger than this you can look all around at a FOV of 90ï¿½
 	if (tilt>46.0f) return 0xffffffff;
 
 	// ok, this is a gross hack that barely works...
@@ -953,7 +953,12 @@ sector_t * FGLRenderer::RenderViewpoint (AActor * camera, GL_IRECT * bounds, flo
 		angle_t a1 = FrustumAngle();
 		clipper.SafeAddClipRangeRealAngles(viewangle+a1, viewangle-a1);
 
-		ProcessScene(toscreen);
+		// [rc4l] Full cutover (user directive, plan A): under core the legacy renderer does not run
+		// at all -- no immediate-mode GL, no captures, no clobbers. Setup above still runs (frame
+		// bookkeeping + the camera capture in SetViewMatrix feeds the ported path); the ported
+		// scene bridge replaces ProcessScene next.
+		if (!hwrender::IsCoreProfile())
+			ProcessScene(toscreen);
 	}
 	else
 	{
@@ -970,7 +975,8 @@ sector_t * FGLRenderer::RenderViewpoint (AActor * camera, GL_IRECT * bounds, flo
 		SetProjection(fov, ratio, fovratio, -iod/2);	// switch to perspective mode and set up clipper
 		clipper.Clear();
 		clipper.SafeAddClipRangeRealAngles(viewangle+a1, viewangle-a1);
-		ProcessScene(toscreen);
+		if (!hwrender::IsCoreProfile())
+			ProcessScene(toscreen);
 
 		// Right eye
 		SetViewport(bounds);
@@ -978,7 +984,8 @@ sector_t * FGLRenderer::RenderViewpoint (AActor * camera, GL_IRECT * bounds, flo
 		SetProjection(fov, ratio, fovratio, +iod/2);	// switch to perspective mode and set up clipper
 		clipper.Clear();
 		clipper.SafeAddClipRangeRealAngles(viewangle+a1, viewangle-a1);
-		ProcessScene(toscreen);
+		if (!hwrender::IsCoreProfile())
+			ProcessScene(toscreen);
 
 		glDrawBuffer(GL_BACK);
 	}

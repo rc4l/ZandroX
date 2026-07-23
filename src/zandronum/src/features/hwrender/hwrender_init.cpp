@@ -398,6 +398,17 @@ void QueueSceneFan(FTexture *tex, const SceneVertex *verts, int count, unsigned 
 void Add2DTexture(FTexture *img, DCanvas::DrawParms &parms)
 {
 	if (img == nullptr) return;
+	// [rc4l] Temporary probe: the drawer's input, so "invisible 2D" separates into bad input vs
+	// bad draw. Removed once the F2DDrawer path is verified.
+	static int probes = 0;
+	if (probes < 8)
+	{
+		probes++;
+		Printf("hwrender 2D probe: tex=%dx%d pos=(%.0f,%.0f) dest=%.0fx%.0f Alpha=%.3f styleBlendOp=%d masked=%d\n",
+			img->GetWidth(), img->GetHeight(), (float)parms.x, (float)parms.y,
+			(float)parms.destwidth, (float)parms.destheight, parms.Alpha,
+			(int)parms.style.BlendOp, (int)parms.masked);
+	}
 	s_drawer2D.AddTexture(img, parms);
 }
 
@@ -414,46 +425,55 @@ void RenderCoreFrame(int width, int height)
 	}
 
 	s_backend->BeginFrame(width, height);
-	glClearColor(0.10f, 0.10f, 0.14f, 1.0f);
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	// [rc4l] Scene first, depth-tested, so the 2D layer composites on top of it.
-	if (s_haveSceneCamera && !s_queueScene.empty())
-	{
-		const Mat4 mvp = ComputeMultiply(s_sceneProjection, s_sceneView);
-		s_renderer2d->SetFog(s_fogR, s_fogG, s_fogB, s_fogDensity, s_fogEnabled);
-		s_renderer2d->BeginScene(mvp);
-		// [rc4l] Two passes, not one insertion-ordered list. Translucent draws do not write depth, so
-		// any opaque surface queued after a sprite would still overwrite the depth the sprite tested
-		// against and erase part of it -- which is what "enemies cut in half" looks like.
-		for (int pass = 0; pass < 2; pass++)
-		{
-			const bool wantTranslucent = (pass == 1);
-			for (size_t i = 0; i < s_queueScene.size(); i++)
-			{
-				const QueuedQuad &q = s_queueScene[i];
-				if (q.translucent != wantTranslucent) continue;
-				s_renderer2d->DrawSceneFan((TextureHandle)q.texture, q.verts.data(), (int)q.verts.size(),
-					q.r, q.g, q.b, q.a, q.translucent);
-			}
-		}
-	}
+	// [rc4l] Full cutover (plan A): one pipeline owns the frame. The legacy renderer no longer runs
+	// under core (ProcessScene is gated off), the bespoke capture queues are dead, and the vendored
+	// F2DDrawer + ported render state draw everything. The scene comes back via the ported scene
+	// bridge next; until then the world is deliberately black.
 	s_queueScene.clear();
-
-	// [rc4l] The queue. F2DDrawer is wired and raises only one GL error per frame, which is far too
-	// few to explain 54 dropped draws -- see PLAN.md; the cause is elsewhere.
-	s_renderer2d->Begin(width, height);
-	for (size_t i = 0; i < s_queue2D.size(); i++)
-	{
-		const Queued2D &q = s_queue2D[i];
-		s_renderer2d->DrawTexturedQuad((TextureHandle)q.texture,
-			q.x, q.y, q.w, q.h,
-			q.u0, q.v0, q.u1, q.v1,
-			q.r, q.g, q.b, q.a,
-			BlendMode::Translucent);
-	}
 	s_queue2D.clear();
+
+	// [rc4l] All engine 2D (menus, fonts, HUD, console) through the vendored F2DDrawer + the ported
+	// render state -- it owns render styles, translations, clipping and colour overlays per draw,
+	// which the bespoke queue re-derived and kept getting wrong (user directive: adopt UZDoom's
+	// layers). Drawn last so UI composites over the weapon.
+	// [rc4l] THE archive-era "invisible 2D" root cause: Draw2D takes its viewport from
+	// zx_screen->mScreenViewport, which the minimal framebuffer never filled -- so every 2D draw
+	// rasterised into a 0x0 viewport: no pixels, no errors. Found by the draw probe (vp=(0,0,0,0)).
+	zx_screen->mScreenViewport.left = 0;
+	zx_screen->mScreenViewport.top = 0;
+	zx_screen->mScreenViewport.width = width;
+	zx_screen->mScreenViewport.height = height;
+	zx_screen->mSceneViewport = zx_screen->mScreenViewport;
+	zx_screen->mOutputLetterbox = zx_screen->mScreenViewport;
+
+	// [rc4l] Temporary probes around Draw2D (drain errors; read back a pixel where the HUD icon
+	// lands) -- separates "not drawn" from "drawn then lost", per the PLAN's method note.
+	static int frameProbes = 0;
+	const bool probing = frameProbes < 4;
+	if (probing) { while (glGetError() != GL_NO_ERROR) {} }
+	Draw2D(&s_drawer2D, OpenGLRenderer::gl_RenderState);
+	if (probing)
+	{
+		frameProbes++;
+		int errs = 0; while (glGetError() != GL_NO_ERROR) errs++;
+		unsigned char px[4] = {0,0,0,0};
+		glReadPixels(30, 20, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, px);
+		unsigned char px2[4] = {0,0,0,0};
+		glReadPixels(width/2, height/2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, px2);
+		Printf("hwrender Draw2D probe: errs=%d hudpx=(%d,%d,%d,%d) centerpx=(%d,%d,%d,%d)\n",
+			errs, px[0], px[1], px[2], px[3], px2[0], px2[1], px2[2], px2[3]);
+	}
+	// [rc4l] Their material path binds sampler objects on the texture units and never unbinds; the
+	// bespoke scene pass still uses legacy per-texture parameters, and a leftover CLAMP sampler
+	// overrides them -- the wall-smearing state leak. Unbind until the scene also uses their state.
+	for (unsigned int u = 0; u < 8; u++) glBindSampler(u, 0);
 	s_drawer2D.Clear();
+	// [rc4l] Arm the drawer for the next frame's AddTexture calls, which arrive before the next
+	// RenderCoreFrame.
+	s_drawer2D.Begin(width, height);
 
 	s_backend->EndFrame();
 }

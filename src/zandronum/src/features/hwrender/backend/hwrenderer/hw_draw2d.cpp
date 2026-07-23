@@ -23,6 +23,8 @@
 
 #include "zx_video.h"
 #include "cmdlib.h"
+// [rc4l] GL entry points for the temporary draw probe below.
+#include "gl_system.h"
 #include "buffers.h"
 #include "flatvertices.h"
 #include "hw_viewpointbuffer.h"
@@ -223,7 +225,29 @@ void Draw2D(F2DDrawer* drawer, FRenderState& state, int x, int y, int width, int
 			{
 			default:
 			case F2DDrawer::DrawTypeTriangles:
-				state.DrawIndexed(DT_Triangles, cmd.mIndexIndex, cmd.mIndexCount);
+				// [rc4l] Temporary probe (first command of the first frames): pin down where the
+				// one-per-frame GL error comes from and what program/viewport the draw actually
+				// runs with -- invisible-yet-errorless draws point at zeroed transforms.
+				{
+					static int drawProbes = 0;
+					const bool p = drawProbes < 3;
+					int preErrs = 0, postErrs = 0;
+					if (p) { while (glGetError() != GL_NO_ERROR) preErrs++; }
+					state.DrawIndexed(DT_Triangles, cmd.mIndexIndex, cmd.mIndexCount);
+					if (p)
+					{
+						drawProbes++;
+						while (glGetError() != GL_NO_ERROR) postErrs++;
+						GLint prog = -1, vp[4] = {-1,-1,-1,-1}, vao = -1, elem = -1;
+						glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
+						glGetIntegerv(GL_VIEWPORT, vp);
+						glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &vao);
+						glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &elem);
+						Printf("hwrender draw probe: preErrs=%d postErrs=%d prog=%d vp=(%d,%d,%d,%d) vao=%d elem=%d idx=%d cnt=%d\n",
+							preErrs, postErrs, prog, vp[0], vp[1], vp[2], vp[3], vao, elem,
+							cmd.mIndexIndex, cmd.mIndexCount);
+					}
+				}
 				break;
 
 			case F2DDrawer::DrawTypeLines:
