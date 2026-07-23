@@ -45,15 +45,10 @@ the C++20-ill-formed template-id destructor in `tarray.h`.
 
 ## NOT verified (the honest gap)
 
-- **Runtime.** Nothing on this branch has been run. The archive attempt rendered MAP01 through the
-  core path at ~25% A/B difference with known defects (sprite slice, 2D gaps — see the PLAN log);
-  this branch carries that code but its behaviour on the 64-bit base is unconfirmed. The Zandronum
-  MCP is registered for this project but connects next session — first action then: launch MAP01
-  under `vid_hwrender 0` (legacy must be unregressed, especially SDL2 input/video), then `1`, and
-  A/B both against the pre-port captures (`tools/ab_render.py`).
 - **Keyboard/mouse input** under native SDL2 (scancode path) needs a human at the keyboard.
 - The Vulkan *backend* (`rendering/vulkan`) is not compiled — that is plan P5, behind the same seam;
   ZVulkan-the-library is the adjacency this branch wires.
+- Core-path parity: see the three user-confirmed defects below.
 
 ## Runtime verification (MCP + user, this session)
 
