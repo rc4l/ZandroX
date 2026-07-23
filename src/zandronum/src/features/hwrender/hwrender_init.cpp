@@ -35,6 +35,7 @@ EXTERN_CVAR(Int, gl_debug_level)
 #include "features/hwrender/backend/hwrenderer/data/hw_lightbuffer.h"
 #include "features/hwrender/backend/hwrenderer/data/hw_bonebuffer.h"
 #include "features/hwrender/backend/hwrenderer/data/hw_viewpointbuffer.h"
+#include "features/hwrender/backend/hwrenderer/data/hw_viewpointuniforms.h"
 #include "features/hwrender/backend/hwrenderer/data/flatvertices.h"
 
 namespace hwrender
@@ -247,6 +248,12 @@ bool s_haveSceneCamera = false;
 // [rc4l] Lighting the legacy path applied via glColor4f; scene draws inherit it.
 unsigned char s_surfR = 255, s_surfG = 255, s_surfB = 255, s_surfA = 255;
 
+// [rc4l] Scene-bridge state: true between BeginSceneDraw and the end of RenderCoreFrame. While in
+// scene, the legacy traversal's emission hooks draw INLINE through the ported FRenderState --
+// per-draw state applied at the draw, no captured globals, no deferred replay (plan A).
+bool s_inScene = false;
+bool s_sceneDrawnThisFrame = false;
+
 // [rc4l] Fog for the scene pass, as gl_SetFog computed it.
 float s_fogR = 0.0f, s_fogG = 0.0f, s_fogB = 0.0f, s_fogDensity = 0.0f;
 bool s_fogEnabled = false;
@@ -354,16 +361,45 @@ void SetSceneCamera(float roll, float pitch, float yaw, float camX, float camY, 
 
 void QueueSceneQuad(FTexture *tex, const SceneVertex corners[4], unsigned int rgba)
 {
-	const unsigned int handle = GLHandleFor(tex);
-	if (handle == 0) return;
-	QueuedQuad q;
-	q.texture = handle;
-	q.verts.assign(corners, corners + 4);
-	q.translucent = false;
-	// [rc4l] rgba is the caller's tint slot; scene lighting comes from the captured glColor4f value.
-	(void)rgba;
-	q.r = s_surfR; q.g = s_surfG; q.b = s_surfB; q.a = s_surfA;
-	s_queueScene.push_back(q);
+	QueueSceneFan(tex, corners, 4, rgba, false, 0, false);
+}
+
+// [rc4l] Plan-A scene bridge: called from gl_scene right before ProcessScene. The legacy traversal
+// and per-item sequencing run unchanged; the emission hooks below draw inline through the ported
+// FRenderState. The viewpoint is the captured camera (SetSceneCamera, fed by the SetViewMatrix
+// hook) loaded into the ported viewpoint buffer -- the same matrices the bespoke path verified.
+void BeginSceneDraw(int vw, int vh)
+{
+	(void)vw; (void)vh;
+	if (!EnsureFrameResources() || !s_haveSceneCamera) return;
+
+	auto &st = OpenGLRenderer::gl_RenderState;
+
+	// The legacy SetViewport already set the scene glViewport (a core-legal call); the clear covers
+	// the whole framebuffer regardless of viewport, which matches the legacy border handling.
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	HWViewpointUniforms vp;
+	vp.mProjectionMatrix.loadMatrix(s_sceneProjection.m);
+	vp.mViewMatrix.loadMatrix(s_sceneView.m);
+	vp.CalcDependencies();
+	zx_screen->mViewpoints->Clear();
+	zx_screen->mViewpoints->SetViewpoint(st, &vp);
+
+	// Stream scene vertices through the ported flat-vertex buffer, exactly as their renderer does.
+	zx_screen->mVertexData->GetBufferObjects().first->Map();
+	st.SetVertexBuffer(zx_screen->mVertexData);
+
+	st.EnableDepthTest(true);
+	st.SetDepthFunc(DF_Less);
+	st.SetDepthMask(true);
+	st.EnableFog(false);
+	st.SetColor(1.f, 1.f, 1.f, 1.f);
+	st.SetSoftLightLevel(-1);
+
+	s_inScene = true;
+	s_sceneDrawnThisFrame = true;
 }
 
 void SetFogParams(float r, float g, float b, float density, bool enabled)
@@ -377,22 +413,35 @@ void SetFogParams(float r, float g, float b, float density, bool enabled)
 
 void SetSurfaceColor(float r, float g, float b, float a)
 {
-	s_surfR = ToByte(r); s_surfG = ToByte(g); s_surfB = ToByte(b); s_surfA = ToByte(a);
+	// [rc4l] Straight into the ported per-draw state -- the draw that follows applies it, and
+	// nothing else reads it later. The captured-global disease (decals/portals/dynlights clobbering
+	// a deferred replay) cannot exist in this shape.
+	if (s_inScene) OpenGLRenderer::gl_RenderState.SetColor(r, g, b, a);
 }
 
 void QueueSceneFan(FTexture *tex, const SceneVertex *verts, int count, unsigned int rgba, bool translucent,
 	int translation, bool patchTex)
 {
-	if (count < 3) return;
-	const unsigned int handle = GLHandleFor(tex, translation, patchTex);
-	if (handle == 0) return;
-	QueuedQuad q;
-	q.texture = handle;
-	q.verts.assign(verts, verts + count);
-	q.translucent = translucent;
-	(void)rgba;
-	q.r = s_surfR; q.g = s_surfG; q.b = s_surfB; q.a = s_surfA;
-	s_queueScene.push_back(q);
+	if (count < 3 || !s_inScene || tex == nullptr) return;
+	(void)rgba; (void)patchTex;
+	auto &st = OpenGLRenderer::gl_RenderState;
+
+	// [rc4l] Inline draw through the ported pipeline: their material path (same machinery the 2D
+	// milestone verified), their vertex stream, their state applied at this draw.
+	st.SetMaterial(tex, UF_Texture, 0, CLAMP_NONE, translation, -1);
+	st.SetRenderStyle(translucent ? STYLE_Translucent : STYLE_Normal);
+	st.SetDepthMask(!translucent);
+	// Masked geometry punches holes via the alpha test; translucent draws blend instead.
+	st.AlphaFunc(Alpha_GEqual, translucent ? 0.f : 0.5f);
+
+	auto alloc = zx_screen->mVertexData->AllocVertices(count);
+	if (alloc.first == nullptr) return;
+	for (int i = 0; i < count; i++)
+	{
+		// SceneVertex carries (x, height, y) in GL order; FFlatVertex::Set takes (x, z=height, y).
+		alloc.first[i].Set(verts[i].x, verts[i].y, verts[i].z, verts[i].u, verts[i].v);
+	}
+	st.Draw(DT_TriangleFan, alloc.second, count);
 }
 
 void Add2DTexture(FTexture *img, DCanvas::DrawParms &parms)
@@ -424,14 +473,22 @@ void RenderCoreFrame(int width, int height)
 		return;
 	}
 
-	s_backend->BeginFrame(width, height);
-	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	// [rc4l] Full cutover (plan A): one pipeline owns the frame. The legacy renderer no longer runs
-	// under core (ProcessScene is gated off), the bespoke capture queues are dead, and the vendored
-	// F2DDrawer + ported render state draw everything. The scene comes back via the ported scene
-	// bridge next; until then the world is deliberately black.
+	// [rc4l] Full cutover (plan A): one pipeline owns the frame. On frames with a scene, the world
+	// already drew inline during RenderView (BeginSceneDraw cleared first); only clear here when no
+	// scene ran (menus before a level, wipes) so the 2D has a defined backdrop.
+	if (!s_sceneDrawnThisFrame)
+	{
+		s_backend->BeginFrame(width, height);
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	}
+	else
+	{
+		// The scene streamed through the ported flat-vertex buffer; close it out before the 2D
+		// pass reuses the pipeline.
+		zx_screen->mVertexData->GetBufferObjects().first->Unmap();
+		s_inScene = false;
+	}
 	s_queueScene.clear();
 	s_queue2D.clear();
 
@@ -476,6 +533,8 @@ void RenderCoreFrame(int width, int height)
 	s_drawer2D.Begin(width, height);
 
 	s_backend->EndFrame();
+	s_sceneDrawnThisFrame = false;
+	s_inScene = false;
 }
 
 void ShutdownPortedShaders()
@@ -494,6 +553,7 @@ namespace hwrender
 void SetCoreProfile(bool) {}
 bool IsCoreProfile() { return false; }
 void RenderCoreFrame(int, int) {}
+void BeginSceneDraw(int, int) {}
 void Queue2DTexture(FTexture *, float, float, float, float, unsigned int) {}
 void Add2DTexture(FTexture *, DCanvas::DrawParms &) {}
 void Queue2DTextureUV(FTexture *, float, float, float, float, float, float, float, float, unsigned int) {}

@@ -953,12 +953,11 @@ sector_t * FGLRenderer::RenderViewpoint (AActor * camera, GL_IRECT * bounds, flo
 		angle_t a1 = FrustumAngle();
 		clipper.SafeAddClipRangeRealAngles(viewangle+a1, viewangle-a1);
 
-		// [rc4l] Full cutover (user directive, plan A): under core the legacy renderer does not run
-		// at all -- no immediate-mode GL, no captures, no clobbers. Setup above still runs (frame
-		// bookkeeping + the camera capture in SetViewMatrix feeds the ported path); the ported
-		// scene bridge replaces ProcessScene next.
-		if (!hwrender::IsCoreProfile())
-			ProcessScene(toscreen);
+		// [rc4l] Plan A, scene bridge: the traversal and per-item sequencing below run unchanged;
+		// under core the emission hooks draw inline through the ported FRenderState (per-draw
+		// state, no captures), and BeginSceneDraw sets the ported viewpoint first.
+		if (hwrender::IsCoreProfile()) hwrender::BeginSceneDraw(viewwidth, viewheight);
+		ProcessScene(toscreen);
 	}
 	else
 	{
@@ -975,8 +974,7 @@ sector_t * FGLRenderer::RenderViewpoint (AActor * camera, GL_IRECT * bounds, flo
 		SetProjection(fov, ratio, fovratio, -iod/2);	// switch to perspective mode and set up clipper
 		clipper.Clear();
 		clipper.SafeAddClipRangeRealAngles(viewangle+a1, viewangle-a1);
-		if (!hwrender::IsCoreProfile())
-			ProcessScene(toscreen);
+		ProcessScene(toscreen);
 
 		// Right eye
 		SetViewport(bounds);
@@ -984,8 +982,7 @@ sector_t * FGLRenderer::RenderViewpoint (AActor * camera, GL_IRECT * bounds, flo
 		SetProjection(fov, ratio, fovratio, +iod/2);	// switch to perspective mode and set up clipper
 		clipper.Clear();
 		clipper.SafeAddClipRangeRealAngles(viewangle+a1, viewangle-a1);
-		if (!hwrender::IsCoreProfile())
-			ProcessScene(toscreen);
+		ProcessScene(toscreen);
 
 		glDrawBuffer(GL_BACK);
 	}

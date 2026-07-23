@@ -22,6 +22,11 @@ void ShutdownPortedShaders();
 // cannot run in a core context, so under core it is bypassed entirely and this owns the frame.
 void RenderCoreFrame(int width, int height);
 
+// [rc4l] Plan-A scene bridge: called right before ProcessScene under core. Clears the frame, loads
+// the captured camera into the ported viewpoint buffer, and arms the emission hooks to draw inline
+// through the ported FRenderState (per-draw state -- no captured globals, no deferred replay).
+void BeginSceneDraw(int viewwidth, int viewheight);
+
 // [rc4l] Queues one 2D texture draw for the current core frame; replayed by RenderCoreFrame.
 // [rc4l] Hands one 2D texture draw to UZDoom's F2DDrawer, replacing the bespoke queue.
 void Add2DTexture(FTexture *img, DCanvas::DrawParms &parms);
