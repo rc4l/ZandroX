@@ -58,6 +58,10 @@
 #include "gl/textures/gl_translate.h"
 #include "gl/textures/gl_bitmap.h"
 #include "gl/textures/gl_material.h"
+// [rc4l] hwrender adapter needs the ported backend's hardware-texture wrapper and layer struct.
+#include "features/hwrender/backend/hwrenderer/data/zx_materiallayer.h"
+#include "features/hwrender/backend/common/hw_ihwtexture.h"
+#include "features/hwrender/backend/gl/gl_hwtexture.h" // [rc4l] path-qualified: an unqualified include resolves to our own gl/textures/gl_hwtexture.h
 #include "gl/shaders/gl_shader.h"
 
 EXTERN_CVAR(Bool, gl_render_precise)
@@ -1124,3 +1128,67 @@ CCMD(textureinfo)
 	Printf(PRINT_LOG, "%d system textures, %d hardware textures, %d pixels\n", cntt, cnth, pix);
 }
 
+
+//===========================================================================
+//
+// [rc4l] hwrender adapter: hand the ported backend a hardware texture for a
+// material layer, reusing Zandronum's own upload path (see issue #4).
+//
+//===========================================================================
+// [rc4l] See gl_material.h; mirrors GetLayer's binding sequence but yields the raw GL name.
+unsigned int FMaterial::GetBaseGLHandle(int translation)
+{
+	if (mBaseLayer == NULL) return 0;
+	const FHardwareTexture *hw = mBaseLayer->Bind(0, CM_DEFAULT, 0, translation, NULL, 0);
+	if (hw == NULL) return 0;
+	return const_cast<FHardwareTexture *>(hw)->Bind(0, CM_DEFAULT, translation);
+}
+
+// [rc4l] See gl_material.h; mirrors the legacy 2D bind (BindPatch: per-patch sizing + translation),
+// which is what fonts and HUD patches were uploaded through before the core path existed.
+unsigned int FMaterial::GetPatchGLHandle(int translation, float *u1, float *v1, float *u2, float *v2)
+{
+	if (mBaseLayer == NULL) return 0;
+	const FHardwareTexture *hw = mBaseLayer->BindPatch(0, CM_DEFAULT, translation, 0);
+	if (hw == NULL) return 0;
+	// [rc4l] The patch's valid UV window, exactly as the legacy 2D path sampled it (GetUL()..GetVB()
+	// after BindPatch). Sampling 0..1 instead includes the pow2 padding and the 1px expand border,
+	// which shrinks glyphs inside their quads and opens letter-spacing gaps.
+	if (u1) *u1 = GetUL();
+	if (v1) *v1 = GetVT();
+	if (u2) *u2 = GetUR();
+	if (v2) *v2 = GetVB();
+	// [rc4l] BindPatch normalizes the translation (negative id -> positive index) before creating
+	// the hardware entry; fetch with the same normalization or a translated bind resolves to the
+	// wrong slot and returns 0, silently dropping the draw.
+	if (translation <= 0) translation = -translation;
+	else translation = GLTranslationPalette::GetInternalTranslation(translation);
+	return const_cast<FHardwareTexture *>(hw)->Bind(0, CM_DEFAULT, translation);
+}
+
+IHardwareTexture *FMaterial::GetLayer(int i, int translation, MaterialLayerInfo **pLayer)
+{
+	FTexture *layerTex = (i == 0) ? tex : mTextureLayers[i - 1].texture;
+	FGLTexture *gltex = (i == 0) ? mBaseLayer : (layerTex ? layerTex->gl_info.SystemTexture : NULL);
+
+	if (pLayer != NULL)
+	{
+		if (mLayerInfo == NULL) mLayerInfo = new MaterialLayerInfo;
+		mLayerInfo->layerTexture = layerTex;
+		mLayerInfo->scaleFlags = 0;
+		*pLayer = mLayerInfo;
+	}
+
+	if (gltex == NULL) return NULL;
+
+	// Upload through our own path, then adopt the resulting GL name.
+	const FHardwareTexture *ours = gltex->Bind(0, CM_DEFAULT, 0, translation, NULL, 0);
+	if (ours == NULL) return NULL;
+	unsigned int texid = const_cast<FHardwareTexture *>(ours)->Bind(0, CM_DEFAULT, translation);
+	if (texid == 0) return NULL;
+
+	if (mAdoptedLayers.Size() <= (unsigned)i) mAdoptedLayers.Resize(i + 1);
+	if (mAdoptedLayers[i] == NULL) mAdoptedLayers[i] = new OpenGLRenderer::FHardwareTexture();
+	static_cast<OpenGLRenderer::FHardwareTexture *>(mAdoptedLayers[i])->AdoptTextureHandle(texid);
+	return mAdoptedLayers[i];
+}

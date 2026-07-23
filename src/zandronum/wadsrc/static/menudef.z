@@ -201,9 +201,21 @@ OptionMenu "GLShaderOptions"
 	Option "Shaders for glowing textures",	gl_glow_shader,				"OnOff"
 }
 
+// [rc4l] Backend selector for the modern-renderer port (docs/hwrender-portability-scope.md).
+// Legacy GL is the shipping renderer; core GL and Vulkan are the in-progress port, experimental
+// and restart-only (a GL context is core or compatibility for its whole life).
+OptionValue "RendererBackends"
+{
+	0, "Legacy OpenGL"
+	1, "OpenGL (core, experimental)"
+	2, "Vulkan (experimental)"
+}
+
 OptionMenu "OpenGLOptions"
 {
 	Title "OPENGL OPTIONS"
+	Option "Renderer backend (restart)",	vid_hwrender,	"RendererBackends"
+	StaticText " "
 	Submenu "Dynamic Light Options",	"GLLightOptions"
 	Submenu "Texture Options", 			"GLTextureGLOptions"
 	Submenu "Shader Options", 			"GLShaderOptions"

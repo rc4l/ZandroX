@@ -310,6 +310,40 @@ public:
 	}
 private:
 	T *Array;
+public:
+	// [rc4l] Raw buffer access used by the ported hwrender backend; returns non-const even from a const object, matching UZDoom's TArray, whose callers rely on it.
+	T *Data() const { return Array; }
+
+	// [rc4l] Reset frees the storage as well as emptying, which UZDoom's code relies on.
+	void Reset()
+	{
+		Clear();
+		Most = 0;
+		if (Array != NULL)
+		{
+			M_Free(Array);
+			Array = NULL;
+		}
+	}
+
+	// [rc4l] UZDoom's "size, then fill" constructor; the bool selects reserve-vs-default-construct.
+	TArray(unsigned int count, bool reserve)
+	{
+		Most = count;
+		Count = reserve ? count : 0;
+		Array = count > 0 ? (T *)M_Malloc(sizeof(T) * count) : NULL;
+		if (reserve)
+		{
+			for (unsigned int i = 0; i < count; ++i) ::new(&Array[i]) T;
+		}
+	}
+
+	// [rc4l] Range-for support, as UZDoom's TArray has; the ported backend iterates TArrays directly.
+	T *begin() { return Array; }
+	T *end() { return Array + Count; }
+	const T *begin() const { return Array; }
+	const T *end() const { return Array + Count; }
+private:
 	unsigned int Most;
 	unsigned int Count;
 
@@ -352,7 +386,8 @@ template<class T, class TT=T>
 class TDeletingArray : public TArray<T, TT>
 {
 public:
-	~TDeletingArray<T, TT> ()
+	// [rc4l] No template-id on a destructor: C++20 made it ill-formed and GCC enforces it.
+	~TDeletingArray ()
 	{
 		for (unsigned int i = 0; i < TArray<T,TT>::Size(); ++i)
 		{

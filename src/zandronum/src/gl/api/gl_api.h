@@ -82,6 +82,17 @@ __EXTERN PFNGLENABLEVERTEXATTRIBARRAYPROC glEnableVertexAttribArray;
 __EXTERN PFNGLDISABLEVERTEXATTRIBARRAYPROC glDisableVertexAttribArray;
 __EXTERN PFNGLVERTEXATTRIBPOINTERPROC glVertexAttribPointer;
 
+// [rc4l] Vertex Array Objects (GL 3.0), required by the Core-profile hwrender backend. The legacy
+// immediate-mode renderer never used these, so loading them is additive and inert until Phase 1.
+__EXTERN PFNGLGENVERTEXARRAYSPROC glGenVertexArrays;
+__EXTERN PFNGLBINDVERTEXARRAYPROC glBindVertexArray;
+__EXTERN PFNGLDELETEVERTEXARRAYSPROC glDeleteVertexArrays;
+
+// [rc4l] Core (GL 2.0) shader/program status queries used by the hwrender backend. The legacy
+// renderer used the ARB glGetObjectParameteriv instead, so these are additive/inert until Phase 1.
+__EXTERN PFNGLGETSHADERIVPROC glGetShaderiv;
+__EXTERN PFNGLGETPROGRAMIVPROC glGetProgramiv;
+
 __EXTERN PFNGLMAPBUFFERRANGEPROC glMapBufferRange;
 __EXTERN PFNGLFLUSHMAPPEDBUFFERRANGEPROC glFlushMappedBufferRange;
 

@@ -95,6 +95,9 @@ public:
 //
 //===========================================================================
 
+class IHardwareTexture;
+struct MaterialLayerInfo;
+
 class FMaterial
 {
 	struct FTextureLayer
@@ -109,6 +112,10 @@ class FMaterial
 	FGLTexture *mBaseLayer;	
 	TArray<FTextureLayer> mTextureLayers;
 	int mShaderIndex;
+
+	// [rc4l] Adapter state for the ported hwrender backend: one of their FHardwareTexture wrappers per layer, plus the layer info it hands back (see issue #4).
+	TArray<IHardwareTexture *> mAdoptedLayers;
+	MaterialLayerInfo *mLayerInfo = nullptr;
 
 	short LeftOffset[3];
 	short TopOffset[3];
@@ -134,6 +141,13 @@ public:
 	{
 		return !!mBaseLayer->tex->bMasked;
 	}
+
+	// [rc4l] Accessors the ported hwrender backend expects on FMaterial (see issue #4).
+	FTexture *Source() const { return tex; }
+	int GetShaderIndex() const { return mShaderIndex; }
+	int NumLayers() const { return mTextureLayers.Size() + 1; }
+	// [rc4l] Returns the ported backend's hardware texture for layer i, adopting the GL id from our own upload path.
+	IHardwareTexture *GetLayer(int i, int translation, MaterialLayerInfo **pLayer = nullptr);
 
 	void Bind(int cm, int clamp = 0, int translation = 0, int overrideshader = 0);
 	void BindPatch(int cm, int translation = 0, int overrideshader = 0);
@@ -246,6 +260,16 @@ public:
 
 	static void DeleteAll();
 	static void FlushAll();
+	// [rc4l] Base-layer GL handle for the hwrender 2D path, which needs a raw id rather than an FGLTexture.
+	unsigned int GetBaseGLHandle(int translation = 0);
+	// [rc4l] Patch-variant handle for 2D draws: the legacy 2D path binds via BindPatch (per-patch
+	// sizing + translation), not the world-texture variant GetBaseGLHandle yields. The optional
+	// out-params receive the patch's UV window (FGLTexture::GetUL/VT/UR/VB) -- patches carry a 1px
+	// expand border, so sampling 0..1 draws that transparent border inside the quad and text
+	// develops letter-spacing gaps.
+	unsigned int GetPatchGLHandle(int translation = 0,
+		float *u1 = 0, float *v1 = 0, float *u2 = 0, float *v2 = 0);
+
 	static FMaterial *ValidateTexture(FTexture * tex);
 	static FMaterial *ValidateTexture(FTextureID no, bool trans);
 

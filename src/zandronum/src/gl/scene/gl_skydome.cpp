@@ -596,9 +596,9 @@ void GLSkyPortal::DrawContents()
 
 		if (origin->texture[0])
 		{
-			gl_RenderState.SetTextureMode(TM_OPAQUE);
+			gl_RenderState.SetTextureMode(LEGACY_TM_OPAQUE);
 			RenderDome(origin->skytexno1, origin->texture[0], origin->x_offset[0], origin->y_offset, origin->mirrored, CM_Index);
-			gl_RenderState.SetTextureMode(TM_MODULATE);
+			gl_RenderState.SetTextureMode(LEGACY_TM_MODULATE);
 		}
 		
 		gl_RenderState.EnableAlphaTest(true);

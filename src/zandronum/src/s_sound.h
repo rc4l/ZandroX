@@ -136,7 +136,10 @@ public:
 	}
 	operator FString() const
 	{
-		return ID ? S_sfx[ID].name : "";
+		// [rc4l] Both branches spelled as FString: with the hwrender FString additions, MSVC
+		// finds more than one common type for (FString, const char[1]) and rejects the
+		// conditional as ambiguous (C2445); gcc/clang picked FString silently.
+		return ID ? S_sfx[ID].name : FString();
 	}
 	operator const char *() const
 	{

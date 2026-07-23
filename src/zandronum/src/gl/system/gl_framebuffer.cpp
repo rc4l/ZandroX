@@ -59,6 +59,8 @@
 #include "gl/textures/gl_hwtexture.h"
 #include "gl/textures/gl_texture.h"
 #include "gl/textures/gl_translate.h"
+// [rc4l] FRemapTable, for the DrawParms translation the core 2D hook forwards.
+#include "r_data/r_translate.h"
 #include "gl/textures/gl_skyboxtexture.h"
 #include "gl/utility/gl_clock.h"
 #include "gl/utility/gl_templates.h"
@@ -75,6 +77,7 @@ FGLRenderer *GLRenderer;
 
 void gl_SetupMenu();
 void gl_LoadExtensions();
+#include "features/hwrender/hwrender_init.h"
 void gl_PrintStartupLog();
 
 //==========================================================================
@@ -119,6 +122,11 @@ void OpenGLFrameBuffer::InitializeState()
 	static bool first=true;
 
 	gl_LoadExtensions();
+	// [rc4l] The ported backend needs the GL entry points, so this is the earliest safe point to start it.
+	if (hwrender::IsCoreProfile())
+	{
+		hwrender::InitPortedShaders();
+	}
 	Super::InitializeState();
 	if (first)
 	{
@@ -187,6 +195,18 @@ CVAR(Bool, gl_draw_sync, true, 0) //false, CVAR_ARCHIVE|CVAR_GLOBALCONFIG)
 
 void OpenGLFrameBuffer::Update()
 {
+	// [rc4l] The legacy renderer is immediate-mode and cannot draw in a core context, so under core
+	// the ported path owns the whole frame and the legacy draw calls below are skipped entirely.
+	if (hwrender::IsCoreProfile())
+	{
+		if (!CanUpdate()) return;
+		hwrender::RenderCoreFrame(GetWidth(), GetHeight());
+		Swap();
+		swapped = false;
+		Unlock();
+		return;
+	}
+
 	if (!CanUpdate()) 
 	{
 		GLRenderer->Flush();
@@ -430,6 +450,15 @@ void STACK_ARGS OpenGLFrameBuffer::DrawTextureV(FTexture *img, double x0, double
 
 	if (ParseDrawTextureTags(img, x0, y0, tag, tags, &parms, true))
 	{
+		// [rc4l] Under core the legacy 2D drawer cannot run, so the draw is queued for the ported path.
+		if (hwrender::IsCoreProfile())
+		{
+			// [rc4l] Full DrawParms into the vendored F2DDrawer -- it owns offsets, clipping,
+			// render styles, translations and colour overlays per draw, so nothing is re-derived
+			// here (user directive: adopt UZDoom's layers, retire the bespoke queue).
+			hwrender::Add2DTexture(img, parms);
+			return;
+		}
 		if (GLRenderer != NULL) GLRenderer->DrawTexture(img, parms);
 	}
 }

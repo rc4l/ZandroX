@@ -176,6 +176,8 @@ struct PalEntry
 	PalEntry () {}
 	PalEntry (uint32 argb) { d = argb; }
 	operator uint32 () const { return d; }
+	// [rc4l] Same weights UZDoom uses; its 2D drawer desaturates with this.
+	int Luminance() const { return (r * 77 + g * 143 + b * 37) >> 8; }
 	PalEntry &operator= (uint32 other) { d = other; return *this; }
 	PalEntry InverseColor() const { PalEntry nc; nc.a = a; nc.r = 255 - r; nc.g = 255 - g; nc.b = 255 - b; return nc; }
 #ifdef __BIG_ENDIAN__

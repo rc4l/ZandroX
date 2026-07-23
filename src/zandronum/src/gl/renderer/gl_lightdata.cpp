@@ -39,6 +39,7 @@
 */
 
 
+#include "features/hwrender/hwrender_init.h"
 #include "gl/system/gl_system.h"
 #include "gl/system/gl_interface.h"
 #include "gl/system/gl_cvars.h"
@@ -171,15 +172,15 @@ void gl_GetRenderStyle(FRenderStyle style, bool drawopaque, bool allowcolorblend
 	int srcblend = blendstyles[style.SrcAlpha&3];
 	int dstblend = blendstyles[style.DestAlpha&3];
 	int blendequation = renderops[style.BlendOp&15];
-	int texturemode = drawopaque? TM_OPAQUE : TM_MODULATE;
+	int texturemode = drawopaque? LEGACY_TM_OPAQUE : LEGACY_TM_MODULATE;
 
 	if (style.Flags & STYLEF_ColorIsFixed)
 	{
-		texturemode = TM_MASK;
+		texturemode = LEGACY_TM_MASK;
 	}
 	else if (style.Flags & STYLEF_InvertSource)
 	{
-		texturemode = drawopaque? TM_INVERTOPAQUE : TM_INVERT;
+		texturemode = drawopaque? LEGACY_TM_INVERTOPAQUE : LEGACY_TM_INVERT;
 	}
 
 	if (blendequation == -1)
@@ -345,6 +346,16 @@ void gl_SetColor(int light, int rellight, const FColormap * cm, float alpha, Pal
 	float r,g,b;
 
 	gl_GetLightColor(light, rellight, cm, &r, &g, &b, weapon);
+
+	// [rc4l] Core removes glColor4f, so the ported path records the same value instead.
+	if (hwrender::IsCoreProfile())
+	{
+		if (glset.lightmode != 8)
+			hwrender::SetSurfaceColor(r * ThingColor.r/255.0f, g * ThingColor.g/255.0f, b * ThingColor.b/255.0f, alpha);
+		else
+			hwrender::SetSurfaceColor(r, g, b, alpha);
+		return;
+	}
 
 	if (glset.lightmode != 8)
 	{
@@ -603,6 +614,7 @@ void gl_SetFog(int lightlevel, int rellight, const FColormap *cmap, bool isaddit
 	{
 		gl_RenderState.EnableFog(false);
 		gl_RenderState.SetFog(0,0);
+		if (hwrender::IsCoreProfile()) hwrender::SetFogParams(0.f, 0.f, 0.f, 0.f, false);
 	}
 	else
 	{
@@ -628,6 +640,13 @@ void gl_SetFog(int lightlevel, int rellight, const FColormap *cmap, bool isaddit
 
 		gl_RenderState.EnableFog(true);
 		gl_RenderState.SetFog(fogcolor, fogdensity);
+
+		// [rc4l] Core has no fixed-function fog; the ported path records the same parameters.
+		if (hwrender::IsCoreProfile())
+		{
+			hwrender::SetFogParams(fogcolor.r / 255.0f, fogcolor.g / 255.0f, fogcolor.b / 255.0f,
+				fogdensity, true);
+		}
 
 		// Korshun: fullbright fog like in software renderer.
 		if (glset.lightmode == 8 && glset.brightfog && fogdensity != 0 && fogcolor != 0)

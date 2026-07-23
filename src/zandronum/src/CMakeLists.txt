@@ -147,18 +147,9 @@ else( WIN32 )
 			endif( GTK2_FOUND )
 		endif( NOT NO_GTK )
 
-		# Check for Xcursor library and header files
-		find_library( XCURSOR_LIB Xcursor )
-		if( XCURSOR_LIB )
-			find_file( XCURSOR_HEADER "X11/Xcursor/Xcursor.h" )
-			if( XCURSOR_HEADER )
-				add_definitions( -DUSE_XCURSOR=1 )
-				message( STATUS "Found Xcursor at ${XCURSOR_LIB}" )
-				set( ZDOOM_LIBS ${ZDOOM_LIBS} ${XCURSOR_LIB} )
-			else( XCURSOR_HEADER )
-				unset( XCURSOR_LIB )
-			endif( XCURSOR_HEADER )
-		endif( XCURSOR_LIB )
+		# [rc4l] The Xcursor detection is gone: SDL2's native color cursors
+		# (SDL_CreateColorCursor in sdl/i_system.cpp) replaced the USE_XCURSOR hack that
+		# reached into SDL 1.2's private structs for the XDisplay.
 	endif( APPLE )
 	set( NASM_NAMES nasm )
 	
@@ -166,15 +157,16 @@ else( WIN32 )
 		add_definitions( -DNO_GTK=1 )
 	endif( NO_GTK )
 	
-	# Non-Windows version also needs SDL
-	find_package( SDL )
-	if( NOT SDL_FOUND )
-		message( SEND_ERROR "SDL is required for building." )
-	endif( NOT SDL_FOUND )
-	set( ZDOOM_LIBS ${ZDOOM_LIBS} "${SDL_LIBRARY}" )
-	# [BB] Don't put the SDL path in inverted commas. At least on FreeBSD 8.1 this
-	# variable contains two directories.
-	include_directories( ${SDL_INCLUDE_DIR} )
+	# [rc4l] Native SDL2, not the sdl12-compat shim: SDL 1.2 cannot request a GL version or profile, which is what capped macOS at a 2.1 compatibility context.
+	find_package( SDL2 REQUIRED )
+	set( ZDOOM_LIBS ${ZDOOM_LIBS} SDL2::SDL2 SDL2::SDL2main )
+
+	# [rc4l] Vulkan backend support: the vendored ZVulkan lib (added at the top level behind
+	# HAVE_VULKAN). The define gates the Vulkan code paths; the GL backend has no dependency on it.
+	if( HAVE_VULKAN )
+		add_definitions( -DHAVE_VULKAN )
+		set( ZDOOM_LIBS ${ZDOOM_LIBS} zvulkan )
+	endif( HAVE_VULKAN )
 
 	find_path( FPU_CONTROL_DIR fpu_control.h )
 	if( FPU_CONTROL_DIR )
@@ -648,11 +640,9 @@ set( PLAT_SDL_SOURCES
 	sdl/i_main.cpp
 	sdl/i_movie.cpp
 	sdl/i_system.cpp
-	sdl/sdlvideo.cpp
 	sdl/sdlglvideo.cpp
 	sdl/st_start.cpp )
 set( PLAT_MAC_SOURCES
-	sdl/SDLMain.m
 	sdl/iwadpicker_cocoa.mm
 	sdl/i_system_cocoa.mm )
 if( WIN32 )
@@ -1546,3 +1536,71 @@ target_sources( zdoom PRIVATE mcp_bridge.cpp mcp_crash.cpp mcp_event.cpp mcp_ren
 # source list; this glob is safe because these TUs never use IMPLEMENT_CLASS.)
 file( GLOB_RECURSE ZX_COMPUTE_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*_compute.cpp" )
 target_sources( zdoom PRIVATE ${ZX_COMPUTE_SOURCES} )
+
+# [rc4l] hwrender GL backend: links into the engine (VAO + core shader-status entry points now
+# loaded in gl_interface.cpp). Present but dormant -- nothing selects it until the Phase 1
+# Core-context + vid_hwrender switch. No IMPLEMENT_CLASS, so a trailing target_sources is safe.
+target_sources( zdoom PRIVATE features/hwrender/gl_backend.cpp features/hwrender/renderer2d.cpp
+                               features/hwrender/hwrender_init.cpp )
+
+# [rc4l] Ported UZDoom backend: flat include dirs so its internal "gl_buffers.h"-style includes resolve.
+target_include_directories( zdoom PRIVATE
+	features/hwrender/backend
+	features/hwrender/backend/gl
+	features/hwrender/backend/gl_load
+	features/hwrender/backend/hwrenderer
+	features/hwrender/backend/hwrenderer/data
+	features/hwrender/backend/hwrenderer/postprocessing
+	features/hwrender/backend/utility
+	features/hwrender/backend/common
+	features/hwrender/backend/2d )
+# [rc4l] Enabled one file at a time as each is adapted to our tree; see features/hwrender/PLAN.md.
+target_sources( zdoom PRIVATE features/hwrender/backend/utility/matrix.cpp
+                               features/hwrender/backend/common/i_interface.cpp
+                               features/hwrender/backend/gl_load/gl_load.c
+                               features/hwrender/backend/gl/gl_hwtexture.cpp
+                               features/hwrender/backend/common/zx_texbridge.cpp
+                               features/hwrender/backend/gl/gl_debug.cpp
+                               features/hwrender/backend/gl/gl_samplers.cpp
+                               features/hwrender/backend/gl/gl_buffers.cpp
+                               features/hwrender/backend/gl/gl_renderstate.cpp
+                               features/hwrender/backend/gl/gl_shader.cpp
+                               features/hwrender/backend/hwrenderer/data/hw_bonebuffer.cpp
+                               features/hwrender/backend/hwrenderer/data/hw_lightbuffer.cpp
+                               features/hwrender/backend/hwrenderer/data/hw_viewpointbuffer.cpp
+                               features/hwrender/backend/utility/stb_include.cpp
+                               features/hwrender/backend/hwrenderer/data/hw_shaderpatcher.cpp
+                               features/hwrender/backend/common/zx_video.cpp
+                               features/hwrender/backend/2d/v_2ddrawer.cpp
+                               features/hwrender/backend/hwrenderer/hw_draw2d.cpp
+                               features/hwrender/backend/hwrenderer/data/flatvertices.cpp
+                               )
+
+# [rc4l] UZDoom's sources require C++20 (std::strong_ordering, operator<=>); the engine itself is C++14, so raise the standard only for the vendored backend, which is self-contained.
+# The flag spelling is per-compiler: MSVC rejects the GCC/clang -std form.
+if( MSVC )
+	set( ZX_BACKEND_CXX20_FLAG "/std:c++20" )
+else( MSVC )
+	set( ZX_BACKEND_CXX20_FLAG "-std=c++20" )
+endif( MSVC )
+set_source_files_properties(
+	features/hwrender/backend/utility/matrix.cpp
+	features/hwrender/backend/common/i_interface.cpp
+	features/hwrender/backend/gl/gl_hwtexture.cpp
+	features/hwrender/backend/common/zx_texbridge.cpp
+	features/hwrender/backend/gl/gl_debug.cpp
+	features/hwrender/backend/gl/gl_samplers.cpp
+	features/hwrender/backend/gl/gl_buffers.cpp
+	features/hwrender/backend/gl/gl_renderstate.cpp
+	features/hwrender/backend/gl/gl_shader.cpp
+	features/hwrender/backend/hwrenderer/data/hw_bonebuffer.cpp
+	features/hwrender/backend/hwrenderer/data/hw_lightbuffer.cpp
+	features/hwrender/backend/hwrenderer/data/hw_viewpointbuffer.cpp
+	features/hwrender/backend/utility/stb_include.cpp
+	features/hwrender/backend/hwrenderer/data/hw_shaderpatcher.cpp
+	features/hwrender/backend/common/zx_video.cpp
+	features/hwrender/backend/2d/v_2ddrawer.cpp
+	features/hwrender/backend/hwrenderer/hw_draw2d.cpp
+	features/hwrender/backend/hwrenderer/data/flatvertices.cpp
+	features/hwrender/hwrender_init.cpp
+	PROPERTIES COMPILE_OPTIONS "${ZX_BACKEND_CXX20_FLAG}" )

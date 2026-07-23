@@ -708,7 +708,7 @@ OptionValue ZA_RespawnInvulEffects
 OptionMenu "VideoOptions"
 {
 	Title "DISPLAY OPTIONS"
-	
+
 	Submenu "Scoreboard Options", 		"ScoreboardOptions"
 	StaticText " "
 	Slider "Screen size",				"screenblocks", 3.0, 12.0, 1.0, 0

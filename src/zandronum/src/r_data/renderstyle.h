@@ -76,6 +76,14 @@ enum ERenderAlpha
 	STYLEALPHA_One,			// Blend factor is 1.0
 	STYLEALPHA_Src,			// Blend factor is alpha
 	STYLEALPHA_InvSrc,		// Blend factor is 1.0 - alpha
+	// [rc4l] Appended to match UZDoom's ERenderAlpha ordering; the ported render state indexes its blend-factor table by these, so a short enum would mis-map blends. Existing values above are unchanged.
+	STYLEALPHA_SrcCol,		// Blend factor is color (HWR only)
+	STYLEALPHA_InvSrcCol,	// Blend factor is 1.0 - color (HWR only)
+	STYLEALPHA_DstCol,		// Blend factor is dest. color (HWR only)
+	STYLEALPHA_InvDstCol,	// Blend factor is 1.0 - dest. color (HWR only)
+	STYLEALPHA_Dst,			// Blend factor is dest. alpha
+	STYLEALPHA_InvDst,		// Blend factor is 1.0 - dest. alpha
+	STYLEALPHA_MAX
 };
 
 enum ERenderFlags

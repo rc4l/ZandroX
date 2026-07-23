@@ -1,6 +1,19 @@
 #ifndef __TEXTURES_H
 #define __TEXTURES_H
 
+#include "features/hwrender/computation/clampmode_compute.h" // [rc4l] Backs GetClampMode() below.
+
+// [rc4l] UZDoom's texture vocabulary mapped onto ours, so their ported renderer compiles unmodified.
+// FGameTexture is their FTexture+metadata split; ours is the single FTexture that already grew the
+// accessors they expect. Replacing these aliases with a real port is issue #4.
+class FTexture;
+typedef FTexture FGameTexture;
+typedef int FTranslationID;
+
+// [rc4l] Their sentinel translation handles.
+static const FTranslationID NO_TRANSLATION = 0;
+static const FTranslationID INVALID_TRANSLATION = -1;
+typedef int ETexMode;
 #include "doomtype.h"
 
 struct FloatRect
@@ -236,6 +249,24 @@ public:
 	
 	virtual int CopyTrueColorPixels(FBitmap *bmp, int x, int y, int rotate=0, FCopyInfo *inf = NULL);
 	int CopyTrueColorTranslated(FBitmap *bmp, int x, int y, int rotate, FRemapTable *remap, FCopyInfo *inf = NULL);
+	// [rc4l] Declared for the ported backend's uploader; unreached because FMaterial::GetLayer adopts an already-uploaded GL id (see issue #4).
+	struct FTextureBuffer CreateTexBuffer(int translation, int flags);
+
+	// [rc4l] Name the ported hwrender backend uses for our bHasCanvas flag.
+	bool isHardwareCanvas() const { return !!bHasCanvas; }
+
+	// [rc4l] Accessors the ported hwrender backend expects on UZDoom's FGameTexture; ours maps them onto our own fields.
+	bool isWarped() const { return !!bWarped; }
+	bool GetTranslucency() { return gl_info.mIsTransparent > 0; }
+	float GetShaderSpeed() const { return gl_info.shaderspeed; }
+	// [rc4l] We have no PBR material pipeline, so gloss/specular report "unlit".
+	float GetGlossiness() const { return 0.f; }
+	float GetSpecularLevel() const { return 0.f; }
+	// [rc4l] UZDoom splits FGameTexture from its backing FTexture; ours are the same object.
+	FTexture *GetTexture() { return this; }
+	// [rc4l] We dropped the software renderer, so the software-canvas case is permanently false.
+	int GetClampMode(int clampmode) { return ComputeClampMode(clampmode, false, isHardwareCanvas(), isWarped(), gl_info.shaderindex >= FIRST_USER_SHADER); }
+
 	virtual bool UseBasePalette();
 	virtual int GetSourceLump() { return SourceLump; }
 	virtual FTexture *GetRedirect(bool wantwarped);
@@ -263,6 +294,18 @@ public:
 	int GetScaledHeight () { int foo = (Height << 17) / (int)yScale; return (foo >> 1) + (foo & 1); }
 	double GetScaledWidthDouble () { return (Width * 65536.) / double(xScale); }
 	double GetScaledHeightDouble () { return (Height * 65536.) / double(yScale); }
+
+	// [rc4l] UZDoom's names for the scaled size, and a validity check their 2D drawer guards with.
+	// Delegate to the fixed64-adapted accessors above -- the widening casts live in one place.
+	double GetDisplayWidth () { return GetScaledWidthDouble(); }
+	double GetDisplayHeight () { return GetScaledHeightDouble(); }
+	bool isValid () const { return true; }
+	// [rc4l] UZDoom's accessor for the use-type; ours is the older TEX_* value in UseType. The
+	// enum values differ, so only the FontChar case their 2D emitter checks is mapped exactly.
+	ETextureType GetUseType () const
+	{
+		return UseType == TEX_FontChar ? ETextureType::FontChar : ETextureType::Any;
+	}
 
 	int GetScaledLeftOffset () { int foo = (LeftOffset << 17) / (int)xScale; return (foo >> 1) + (foo & 1); }
 	int GetScaledTopOffset () { int foo = (TopOffset << 17) / (int)yScale; return (foo >> 1) + (foo & 1); }

@@ -36,6 +36,8 @@ struct FColormap
 	PalEntry		FadeColor;		// a is fadedensity>>1
 	int				colormap;
 	int				blendfactor;
+	// [rc4l] UZDoom carries a desaturation amount here; ours has no equivalent, so it stays 0.
+	int				Desaturation;
 
 	void Clear()
 	{

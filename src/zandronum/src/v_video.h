@@ -247,10 +247,46 @@ public:
 		double top;
 		double left;
 		fixed_t alpha;
-		uint32 fillcolor;
+		// [rc4l] Float mirror of alpha, kept in step by ParseDrawTextureTags. UZDoom's ported 2D
+		// drawer works in floats; PalEntry converts to and from uint32 so widening the colours here
+		// leaves existing engine code that assigns them as uint32 unchanged.
+		float Alpha;
+		PalEntry fillcolor;
 		FRemapTable *remap;
 		const BYTE *translation;
-		uint32 colorOverlay;
+		PalEntry colorOverlay;
+		// [rc4l] UZDoom's 2D drawer supports a desaturation amount; ours never sets it, so 0 = off.
+		int desaturate;
+		// [rc4l] Their vertex tint, distinct from fillcolor; ours never sets it, so white = no tint.
+		PalEntry color;
+		// [rc4l] Burn-wipe style; our tag parser never requests it.
+		INTBOOL burn;
+		// [rc4l] Paletted-texture path, which belongs to their texture system (issue #4); off for us.
+		INTBOOL indexed;
+		// [rc4l] Their translation handle. Ours are FRemapTable pointers, so this stays "none".
+		FTranslationID TranslationId;
+		// [rc4l] Source-rect window into the texture. Ours draws the whole texture, so this is the
+		// full 0..1 range, expressed the way their drawer expects.
+		double srcx, srcy, srcwidth, srcheight;
+		// [rc4l] Their drawer flips on both axes; our tag parser only ever requests X.
+		INTBOOL flipY;
+		// [rc4l] Skips the texture's own offsets; ours always honours them.
+		INTBOOL nooffset;
+		// [rc4l] Their drawer can rotate a quad; our tag parser never asks for it.
+		double rotateangle;
+		// [rc4l] Their drawer batches quads and breaks the batch when any vertex-affecting field
+		// changes. Same comparison as UZDoom's.
+		bool vertexColorChange(const DrawParms &other) const
+		{
+			return
+				this->Alpha         != other.Alpha        ||
+				this->fillcolor     != other.fillcolor    ||
+				this->colorOverlay  != other.colorOverlay ||
+				this->color         != other.color        ||
+				this->style.Flags   != other.style.Flags  ||
+				this->style.BlendOp != other.style.BlendOp ||
+				this->desaturate    != other.desaturate;
+		}
 		INTBOOL alphaChannel;
 		INTBOOL flipX;
 		fixed_t shadowAlpha;

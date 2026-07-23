@@ -921,28 +921,29 @@ void FString::MergeChars (const char *charset, char newchar)
 	UnlockBuffer();
 }
 
-void FString::Substitute (const FString &oldstr, const FString &newstr)
+bool FString::Substitute (const FString &oldstr, const FString &newstr)
 {
 	return Substitute (oldstr.Chars, newstr.Chars, oldstr.Len(), newstr.Len());
 }
 
-void FString::Substitute (const char *oldstr, const FString &newstr)
+bool FString::Substitute (const char *oldstr, const FString &newstr)
 {
 	return Substitute (oldstr, newstr.Chars, strlen(oldstr), newstr.Len());
 }
 
-void FString::Substitute (const FString &oldstr, const char *newstr)
+bool FString::Substitute (const FString &oldstr, const char *newstr)
 {
 	return Substitute (oldstr.Chars, newstr, oldstr.Len(), strlen(newstr));
 }
 
-void FString::Substitute (const char *oldstr, const char *newstr)
+bool FString::Substitute (const char *oldstr, const char *newstr)
 {
 	return Substitute (oldstr, newstr, strlen(oldstr), strlen(newstr));
 }
 
-void FString::Substitute (const char *oldstr, const char *newstr, size_t oldstrlen, size_t newstrlen)
+bool FString::Substitute (const char *oldstr, const char *newstr, size_t oldstrlen, size_t newstrlen)
 {
+	bool replaced = false;
 	LockBuffer();
 	for (size_t checkpt = 0; checkpt < Len(); )
 	{
@@ -958,6 +959,7 @@ void FString::Substitute (const char *oldstr, const char *newstr, size_t oldstrl
 			}
 			memcpy (Chars + matchpt, newstr, newstrlen);
 			checkpt = matchpt + newstrlen;
+			replaced = true;
 		}
 		else
 		{
@@ -965,6 +967,7 @@ void FString::Substitute (const char *oldstr, const char *newstr, size_t oldstrl
 		}
 	}
 	UnlockBuffer();
+	return replaced;
 }
 
 bool FString::IsInt () const

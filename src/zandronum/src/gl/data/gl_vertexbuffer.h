@@ -32,7 +32,9 @@ struct FFlatVertex	// exactly 32 bytes large
 #define VTO ((FFlatVertex*)NULL)
 
 
-class FFlatVertexBuffer : public FVertexBuffer
+// [rc4l] Renamed so UZDoom's FFlatVertexBuffer can own the plain name; this one belongs to the
+// legacy renderer and goes away with it in P4.
+class LegacyFlatVertexBuffer : public FVertexBuffer
 {
 	FFlatVertex *map;
 
@@ -44,8 +46,8 @@ public:
 	TArray<FFlatVertex> vbo_shadowdata;	// this is kept around for non-VBO rendering
 
 public:
-	FFlatVertexBuffer();
-	~FFlatVertexBuffer();
+	LegacyFlatVertexBuffer();
+	~LegacyFlatVertexBuffer();
 
 	int CreateSubsectorVertices(subsector_t *sub, const secplane_t &plane, int floor);
 	int CreateSectorVertices(sector_t *sec, const secplane_t &plane, int floor);

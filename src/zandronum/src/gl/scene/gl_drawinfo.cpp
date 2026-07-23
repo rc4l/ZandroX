@@ -55,6 +55,8 @@
 #include "gl/textures/gl_material.h"
 #include "gl/utility/gl_clock.h"
 #include "gl/utility/gl_templates.h"
+// [rc4l] IsCoreProfile: unported subsystems here must not clobber the captured surface colour.
+#include "features/hwrender/hwrender_init.h"
 #include "gl/shaders/gl_shader.h"
 
 FDrawInfo * gl_drawinfo;
@@ -1066,7 +1068,9 @@ void FDrawInfo::DrawFloodedPlane(wallseg * ws, float planez, sector_t * sec, boo
 	}
 
 	int rel = getExtraLight();
-	gl_SetColor(lightlevel, rel, &Colormap, 1.0f);
+	// [rc4l] Flood-fill render hacks are unported: their draw is inert under core, but this
+	// gl_SetColor IS captured and would clobber the colour of whatever queues next.
+	if (!hwrender::IsCoreProfile()) gl_SetColor(lightlevel, rel, &Colormap, 1.0f);
 	gl_SetFog(lightlevel, rel, &Colormap, false);
 	gltexture->Bind(Colormap.colormap);
 

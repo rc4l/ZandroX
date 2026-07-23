@@ -60,6 +60,8 @@
 #include "gl/textures/gl_material.h"
 #include "gl/utility/gl_clock.h"
 #include "gl/utility/gl_templates.h"
+// [rc4l] IsCoreProfile: unported subsystems here must not clobber the captured surface colour.
+#include "features/hwrender/hwrender_init.h"
 #include "gl/utility/gl_geometric.h"
 // [AK] New #includes.
 #include "c_console.h"
@@ -981,13 +983,15 @@ void GLHorizonPortal::DrawContents()
 	if (gltexture && gltexture->tex->isFullbright())
 	{
 		// glowing textures are always drawn full bright without color
-		gl_SetColor(255, 0, NULL, 1.f);
+		// [rc4l] Portals are unported: inert under core, but gl_SetColor is captured -- with the
+		// sky/horizon in view this ran every frame and clobbered later surfaces' colours.
+		if (!hwrender::IsCoreProfile()) gl_SetColor(255, 0, NULL, 1.f);
 		gl_SetFog(255, 0, &origin->colormap, false);
 	}
-	else 
+	else
 	{
 		int rel = getExtraLight();
-		gl_SetColor(origin->lightlevel, rel, &origin->colormap, 1.0f);
+		if (!hwrender::IsCoreProfile()) gl_SetColor(origin->lightlevel, rel, &origin->colormap, 1.0f);
 		gl_SetFog(origin->lightlevel, rel, &origin->colormap, false);
 	}
 
