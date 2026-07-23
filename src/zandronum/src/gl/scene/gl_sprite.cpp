@@ -303,7 +303,10 @@ void GLSprite::Draw(int pass)
 					{ v4[0], v4[1], v4[2], ur, vb },
 					{ v3[0], v3[1], v3[2], ul, vb },
 				};
-				hwrender::QueueSceneFan(gltexture->tex, corners, 4, 0xffffffff, true);
+				// [rc4l] Patch variant + translation, exactly as the legacy BindPatch above: the
+				// sprite-window UVs (ul/ur/vt/vb) are computed against the patch texture, and
+				// binding the world variant against them slices the sprite vertically.
+				hwrender::QueueSceneFan(gltexture->tex, corners, 4, 0xffffffff, true, translation, true);
 			}
 		}
 		else

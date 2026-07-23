@@ -56,7 +56,11 @@ void SetSurfaceColor(float r, float g, float b, float a);
 void SetFogParams(float r, float g, float b, float density, bool enabled);
 
 // [rc4l] Queues one convex triangle fan (flats are subsector fans of arbitrary length).
-void QueueSceneFan(FTexture *tex, const SceneVertex *verts, int count, unsigned int rgba, bool translucent = false);
+// [rc4l] patchTex binds the patch texture variant (sprites: legacy binds BindPatch and computes
+// sprite-window UVs against it -- binding the world variant against those UVs slices the sprite);
+// flats keep the world variant, which tiles. translation is the legacy translation id.
+void QueueSceneFan(FTexture *tex, const SceneVertex *verts, int count, unsigned int rgba, bool translucent = false,
+	int translation = 0, bool patchTex = false);
 
 } // namespace hwrender
 

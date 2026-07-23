@@ -380,10 +380,11 @@ void SetSurfaceColor(float r, float g, float b, float a)
 	s_surfR = ToByte(r); s_surfG = ToByte(g); s_surfB = ToByte(b); s_surfA = ToByte(a);
 }
 
-void QueueSceneFan(FTexture *tex, const SceneVertex *verts, int count, unsigned int rgba, bool translucent)
+void QueueSceneFan(FTexture *tex, const SceneVertex *verts, int count, unsigned int rgba, bool translucent,
+	int translation, bool patchTex)
 {
 	if (count < 3) return;
-	const unsigned int handle = GLHandleFor(tex);
+	const unsigned int handle = GLHandleFor(tex, translation, patchTex);
 	if (handle == 0) return;
 	QueuedQuad q;
 	q.texture = handle;
@@ -479,7 +480,7 @@ void Queue2DTextureUV(FTexture *, float, float, float, float, float, float, floa
 void Queue2DTextureLit(FTexture *, float, float, float, float, float, float, float, float) {}
 void SetSceneCamera(float, float, float, float, float, float, bool, bool, float, float, float) {}
 void QueueSceneQuad(FTexture *, const SceneVertex *, unsigned int) {}
-void QueueSceneFan(FTexture *, const SceneVertex *, int, unsigned int, bool) {}
+void QueueSceneFan(FTexture *, const SceneVertex *, int, unsigned int, bool, int, bool) {}
 void SetSurfaceColor(float, float, float, float) {}
 void SetFogParams(float, float, float, float, bool) {}
 bool InitPortedShaders() { return false; }

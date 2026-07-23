@@ -255,8 +255,11 @@ void GLWall::RenderWall(int textured, float * color2, ADynamicLight * light)
 		// [rc4l] RenderWall is called from eight sites: the textured pass, untextured passes for
 		// mirrors and stencils, and per-light passes. Only bit 0 means "sample the texture", so
 		// emitting for the others overdrew good geometry with untextured quads -- which is why the
-		// lower wall sections came out black.
-		if (gltexture != NULL && (textured & 1))
+		// lower wall sections came out black. The per-light re-renders also pass textured=1 with a
+		// lightsource, and queueing those repaints every lit wall as an opaque tinted quad -- the
+		// "sector lighting goes odd when firing" artifact (the muzzle flash is a dynamic light).
+		// Dynamic lights are an unported subsystem; skip their geometry entirely under core.
+		if (gltexture != NULL && (textured & 1) && light == NULL)
 		{
 			const hwrender::SceneVertex corners[4] =
 			{
