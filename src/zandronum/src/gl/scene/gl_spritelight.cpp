@@ -55,6 +55,10 @@
 #include "gl/scene/gl_portal.h"
 #include "gl/shaders/gl_shader.h"
 #include "gl/textures/gl_material.h"
+// [rc4l] Core-path colour capture: the dynamic-light sprite path sets its colour with raw
+// glColor4f, which the ported queue cannot see -- without recording it here the weapon/sprites
+// inherit whatever the last captured surface colour was and flicker as dynlights come and go.
+#include "features/hwrender/hwrender_init.h"
 
 
 //==========================================================================
@@ -163,7 +167,8 @@ static int gl_SetSpriteLight(AActor *self, fixed_t x, fixed_t y, fixed_t z, subs
 		g *= ThingColor.g/255.f;
 		b *= ThingColor.b/255.f;
 		glColor4f(r, g, b, alpha);
-		if (glset.lightmode == 8) 
+		if (hwrender::IsCoreProfile()) hwrender::SetSurfaceColor(r, g, b, alpha);
+		if (glset.lightmode == 8)
 		{
 			glVertexAttrib1f(VATTR_LIGHTLEVEL, gl_CalcLightLevel(lightlevel, rellight, weapon) / 255.0f); // Korshun.
 			gl_RenderState.SetDynLight(result[0], result[1], result[2]);
@@ -184,7 +189,8 @@ static int gl_SetSpriteLight(AActor *self, fixed_t x, fixed_t y, fixed_t z, subs
 		g *= ThingColor.g/255.f;
 		b *= ThingColor.b/255.f;
 
-		glColor4f(r, g, b, alpha);		
+		glColor4f(r, g, b, alpha);
+		if (hwrender::IsCoreProfile()) hwrender::SetSurfaceColor(r, g, b, alpha);
 
 		if (dlightlevel == 0) return 0;
 
@@ -286,8 +292,11 @@ int gl_SetSpriteLighting(FRenderStyle style, AActor *thing, int lightlevel, int 
 
 	if (style.BlendOp == STYLEOP_Shadow)
 	{
-		glColor4f(0.2f * ThingColor.r / 255.f, 0.2f * ThingColor.g / 255.f, 
+		glColor4f(0.2f * ThingColor.r / 255.f, 0.2f * ThingColor.g / 255.f,
 					0.2f * ThingColor.b / 255.f, (alpha = 0.33f));
+		if (hwrender::IsCoreProfile())
+			hwrender::SetSurfaceColor(0.2f * ThingColor.r / 255.f, 0.2f * ThingColor.g / 255.f,
+				0.2f * ThingColor.b / 255.f, 0.33f);
 	}
 	else
 	{

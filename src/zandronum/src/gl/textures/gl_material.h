@@ -262,6 +262,13 @@ public:
 	static void FlushAll();
 	// [rc4l] Base-layer GL handle for the hwrender 2D path, which needs a raw id rather than an FGLTexture.
 	unsigned int GetBaseGLHandle(int translation = 0);
+	// [rc4l] Patch-variant handle for 2D draws: the legacy 2D path binds via BindPatch (per-patch
+	// sizing + translation), not the world-texture variant GetBaseGLHandle yields. The optional
+	// out-params receive the patch's UV window (FGLTexture::GetUL/VT/UR/VB) -- patches carry a 1px
+	// expand border, so sampling 0..1 draws that transparent border inside the quad and text
+	// develops letter-spacing gaps.
+	unsigned int GetPatchGLHandle(int translation = 0,
+		float *u1 = 0, float *v1 = 0, float *u2 = 0, float *v2 = 0);
 
 	static FMaterial *ValidateTexture(FTexture * tex);
 	static FMaterial *ValidateTexture(FTextureID no, bool trans);

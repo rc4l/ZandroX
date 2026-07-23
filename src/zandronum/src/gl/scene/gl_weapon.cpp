@@ -160,6 +160,18 @@ void FGLRenderer::DrawPSprite (player_t * player,pspdef_t *psp,fixed_t sx, fixed
 	{
 		if (tex != NULL)
 		{
+			// [rc4l] Temporary probe for the weapon-slice defect: print the UV window and both
+			// size views a few times so the mismatch (padded-ratio UVs vs unpadded upload, or
+			// patch-vs-texture variant) is read off the log instead of guessed.
+			static int probes = 0;
+			if (probes < 6)
+			{
+				probes++;
+				Printf("hwrender weapon probe: UV=(%.4f,%.4f)-(%.4f,%.4f) texW=%d patchW=%d texH=%d patchH=%d\n",
+					fU1, fV1, fU2, fV2,
+					tex->TextureWidth(GLUSE_TEXTURE), tex->TextureWidth(GLUSE_PATCH),
+					tex->TextureHeight(GLUSE_TEXTURE), tex->TextureHeight(GLUSE_PATCH));
+			}
 			// [rc4l] Lit, not flat white: the weapon takes the sector's light like the world does.
 			hwrender::Queue2DTextureLit(tex->tex, x1, y1, x2 - x1, y2 - y1,
 				fU1, fV1, fU2, fV2);

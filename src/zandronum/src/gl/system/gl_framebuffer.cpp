@@ -59,6 +59,8 @@
 #include "gl/textures/gl_hwtexture.h"
 #include "gl/textures/gl_texture.h"
 #include "gl/textures/gl_translate.h"
+// [rc4l] FRemapTable, for the DrawParms translation the core 2D hook forwards.
+#include "r_data/r_translate.h"
 #include "gl/textures/gl_skyboxtexture.h"
 #include "gl/utility/gl_clock.h"
 #include "gl/utility/gl_templates.h"
@@ -454,9 +456,19 @@ void STACK_ARGS OpenGLFrameBuffer::DrawTextureV(FTexture *img, double x0, double
 			// [rc4l] parms.left/top are the texture's own offsets and must be subtracted from the
 			// position. Font characters have none, which is why text looked right while the
 			// sprite-based HUD icons were placed low enough to fall off the bottom of the screen.
+			// The translation mapping mirrors the legacy 2D bind exactly (see GLRenderer's
+			// DrawTexture): fonts are paletted, so without their remap the glyph indices sample
+			// the raw game palette and render as rainbow garbage.
+			int translation = 0;
+			if (parms.remap != NULL && !parms.remap->Inactive)
+			{
+				GLTranslationPalette *pal = static_cast<GLTranslationPalette*>(parms.remap->GetNative());
+				if (pal) translation = -pal->GetIndex();
+			}
 			hwrender::Queue2DTexture(img, (float)(parms.x - parms.left), (float)(parms.y - parms.top),
 				(float)parms.destwidth, (float)parms.destheight,
-				MAKEARGB((BYTE)((parms.alpha * 255) >> FRACBITS), 255, 255, 255));
+				MAKEARGB((BYTE)((parms.alpha * 255) >> FRACBITS), 255, 255, 255),
+				translation);
 			return;
 		}
 		if (GLRenderer != NULL) GLRenderer->DrawTexture(img, parms);

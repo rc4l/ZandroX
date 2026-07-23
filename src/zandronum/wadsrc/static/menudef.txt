@@ -310,16 +310,6 @@ OptionValue "OffOn"
 	1, "Off"
 }
 
-// [rc4l] Hardware renderer backend selector (vid_hwrender). See docs/hwrender-portability-scope.md.
-// Legacy GL is the shipping renderer; the core-GL and Vulkan backends are the in-progress port and
-// are marked experimental until wired up. Changing this takes effect on restart.
-OptionValue "RendererBackends"
-{
-	0, "Legacy OpenGL"
-	1, "OpenGL (core, experimental)"
-	2, "Vulkan (experimental)"
-}
-
 OptionMenuSettings
 {
 	// These can be overridden if a different menu fonts requires it.
@@ -720,7 +710,6 @@ OptionMenu "VideoOptions"
 	Title "DISPLAY OPTIONS"
 
 	Submenu "Scoreboard Options", 		"ScoreboardOptions"
-	Submenu "OpenGL Options",			"OpenGLOptions"
 	StaticText " "
 	Slider "Screen size",				"screenblocks", 3.0, 12.0, 1.0, 0
 	Slider "Brightness",				"Gamma", 0.75, 3.0, 0.05, 2
@@ -750,23 +739,6 @@ OptionMenu "VideoOptions"
 	Option "Teleporter zoom",			"telezoom", "OnOff"
 	Slider "Earthquake shake intensity",	"r_quakeintensity", 0.0, 1.0, 0.05, 2
 	Option "Interpolate monster movement",	"nomonsterinterpolation", "NoYes"
-}
-
-// [rc4l] OpenGL / hardware renderer options. Previously ZandroX had no menu home for its GL cvars
-// (they were console-only); this collects the ones that already work and adds the backend selector
-// for the modern-renderer port (docs/hwrender-portability-scope.md). The core-GL and Vulkan
-// backends are experimental and restart-only; Legacy OpenGL is the shipping renderer.
-OptionMenu "OpenGLOptions"
-{
-	Title "OPENGL OPTIONS"
-
-	Option "Renderer backend (restart)",	"vid_hwrender", "RendererBackends"
-	StaticText " "
-	Option "Precise render quality",		"gl_render_precise", "OnOff"
-	Option "Seamless geometry",				"gl_seamless", "OnOff"
-	Option "Environment map on mirrors",	"gl_mirror_envmap", "OnOff"
-	Option "Planar reflections",			"gl_plane_reflection", "OnOff"
-	Slider "Mirror recursion depth",		"r_mirror_recursions", 1.0, 10.0, 1.0, 0
 }
 
 //-------------------------------------------------------------------------------------------

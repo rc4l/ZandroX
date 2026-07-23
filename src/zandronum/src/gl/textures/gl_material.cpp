@@ -1144,6 +1144,28 @@ unsigned int FMaterial::GetBaseGLHandle(int translation)
 	return const_cast<FHardwareTexture *>(hw)->Bind(0, CM_DEFAULT, translation);
 }
 
+// [rc4l] See gl_material.h; mirrors the legacy 2D bind (BindPatch: per-patch sizing + translation),
+// which is what fonts and HUD patches were uploaded through before the core path existed.
+unsigned int FMaterial::GetPatchGLHandle(int translation, float *u1, float *v1, float *u2, float *v2)
+{
+	if (mBaseLayer == NULL) return 0;
+	const FHardwareTexture *hw = mBaseLayer->BindPatch(0, CM_DEFAULT, translation, 0);
+	if (hw == NULL) return 0;
+	// [rc4l] The patch's valid UV window, exactly as the legacy 2D path sampled it (GetUL()..GetVB()
+	// after BindPatch). Sampling 0..1 instead includes the pow2 padding and the 1px expand border,
+	// which shrinks glyphs inside their quads and opens letter-spacing gaps.
+	if (u1) *u1 = GetUL();
+	if (v1) *v1 = GetVT();
+	if (u2) *u2 = GetUR();
+	if (v2) *v2 = GetVB();
+	// [rc4l] BindPatch normalizes the translation (negative id -> positive index) before creating
+	// the hardware entry; fetch with the same normalization or a translated bind resolves to the
+	// wrong slot and returns 0, silently dropping the draw.
+	if (translation <= 0) translation = -translation;
+	else translation = GLTranslationPalette::GetInternalTranslation(translation);
+	return const_cast<FHardwareTexture *>(hw)->Bind(0, CM_DEFAULT, translation);
+}
+
 IHardwareTexture *FMaterial::GetLayer(int i, int translation, MaterialLayerInfo **pLayer)
 {
 	FTexture *layerTex = (i == 0) ? tex : mTextureLayers[i - 1].texture;

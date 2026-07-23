@@ -260,11 +260,17 @@ unsigned char ToByte(float v)
 }
 
 // [rc4l] Resolves an engine FTexture to a live GL handle through the existing legacy texture path.
-unsigned int GLHandleFor(FTexture *img)
+// 2D draws use the patch variant with the caller's translation -- the legacy 2D path bound via
+// BindPatch, and paletted textures (fonts) draw rainbow garbage without their translation. The
+// optional out-params receive the patch's valid UV window (see GetPatchGLHandle).
+unsigned int GLHandleFor(FTexture *img, int translation = 0, bool patch = false,
+	float *u1 = nullptr, float *v1 = nullptr, float *u2 = nullptr, float *v2 = nullptr)
 {
 	if (img == nullptr) return 0;
 	FMaterial *mat = FMaterial::ValidateTexture(img);
-	return mat != nullptr ? mat->GetBaseGLHandle() : 0;
+	if (mat == nullptr) return 0;
+	return patch ? mat->GetPatchGLHandle(translation, u1, v1, u2, v2)
+	             : mat->GetBaseGLHandle(translation);
 }
 
 // [rc4l] Brings up the seam's backend + 2D path on first frame; false if it cannot be used.
@@ -295,14 +301,18 @@ bool EnsureFrameResources()
 }
 }
 
-void Queue2DTexture(FTexture *img, float x, float y, float w, float h, unsigned int rgba)
+void Queue2DTexture(FTexture *img, float x, float y, float w, float h, unsigned int rgba,
+	int translation)
 {
-	const unsigned int handle = GLHandleFor(img);
+	// [rc4l] Sample the patch's valid UV window, not 0..1 -- patches carry pow2 padding and a 1px
+	// expand border, and sampling the full texture draws them inside the quad (glyph gaps).
+	float u1 = 0.0f, v1 = 0.0f, u2 = 1.0f, v2 = 1.0f;
+	const unsigned int handle = GLHandleFor(img, translation, true, &u1, &v1, &u2, &v2);
 	if (handle == 0) return;
 	Queued2D q;
 	q.texture = handle;
 	q.x = x; q.y = y; q.w = w; q.h = h;
-	q.u0 = 0.0f; q.v0 = 0.0f; q.u1 = 1.0f; q.v1 = 1.0f;
+	q.u0 = u1; q.v0 = v1; q.u1 = u2; q.v1 = v2;
 	q.r = (rgba >> 16) & 0xff;
 	q.g = (rgba >> 8) & 0xff;
 	q.b = rgba & 0xff;
@@ -311,9 +321,9 @@ void Queue2DTexture(FTexture *img, float x, float y, float w, float h, unsigned 
 }
 
 void Queue2DTextureUV(FTexture *img, float x, float y, float w, float h,
-	float u0, float v0, float u1, float v1, unsigned int rgba)
+	float u0, float v0, float u1, float v1, unsigned int rgba, int translation)
 {
-	const unsigned int handle = GLHandleFor(img);
+	const unsigned int handle = GLHandleFor(img, translation, true);
 	if (handle == 0) return;
 	Queued2D q;
 	q.texture = handle;

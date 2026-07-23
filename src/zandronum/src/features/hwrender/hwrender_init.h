@@ -26,11 +26,14 @@ void RenderCoreFrame(int width, int height);
 // [rc4l] Hands one 2D texture draw to UZDoom's F2DDrawer, replacing the bespoke queue.
 void Add2DTexture(FTexture *img, DCanvas::DrawParms &parms);
 
-void Queue2DTexture(FTexture *img, float x, float y, float w, float h, unsigned int rgba);
+// [rc4l] translation is the legacy GL translation id (0 = none; -GLTranslationPalette::GetIndex()
+// for a DrawParms remap) -- fonts are paletted and draw rainbow garbage without it.
+void Queue2DTexture(FTexture *img, float x, float y, float w, float h, unsigned int rgba,
+	int translation = 0);
 
 // [rc4l] Same, but with explicit texture coordinates; the player weapon needs its own UV window.
 void Queue2DTextureUV(FTexture *img, float x, float y, float w, float h,
-	float u0, float v0, float u1, float v1, unsigned int rgba);
+	float u0, float v0, float u1, float v1, unsigned int rgba, int translation = 0);
 
 // [rc4l] Same, but tinted with the lit surface colour gl_SetColor last recorded. The player weapon
 // is a world object drawn in screen space, so it takes the sector's lighting like everything else.
