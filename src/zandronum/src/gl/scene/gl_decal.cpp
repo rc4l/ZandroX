@@ -53,6 +53,9 @@
 #include "gl/textures/gl_texture.h"
 #include "gl/textures/gl_material.h"
 #include "gl/utility/gl_clock.h"
+// [rc4l] IsCoreProfile: decals are not ported yet, and their per-frame gl_SetColor must not run
+// under core (see DrawDecal).
+#include "features/hwrender/hwrender_init.h"
 
 struct DecalVertex
 {
@@ -67,6 +70,13 @@ struct DecalVertex
 //==========================================================================
 void GLWall::DrawDecal(DBaseDecal *decal)
 {
+	// [rc4l] Decals are an unported subsystem: their immediate-mode draw is inert under core, but
+	// the gl_SetColor below IS captured -- so one bullet decal on a wall re-captured its (fading!)
+	// colour every frame, and every surface queued after that wall inherited it. That was the
+	// "sector keeps perpetually blinking after I fire" defect: the first shot leaves a permanent
+	// decal whose animating alpha clobbered the colour capture mid-frame forever after.
+	if (hwrender::IsCoreProfile()) return;
+
 	line_t * line=seg->linedef;
 	side_t * side=seg->sidedef;
 	int i;
