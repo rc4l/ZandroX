@@ -55,6 +55,28 @@ the C++20-ill-formed template-id destructor in `tarray.h`.
 - The Vulkan *backend* (`rendering/vulkan`) is not compiled — that is plan P5, behind the same seam;
   ZVulkan-the-library is the adjacency this branch wires.
 
+## Runtime verification (MCP + user, this session)
+
+- **Legacy path (`vid_hwrender 0`): verified unregressed under native SDL2.** MAP01 renders
+  correctly (geometry, weapon, HUD icons, crosshair); "GL context: 2.1 compatibility" logged.
+- **Backend selector menu: verified on screen** — "Renderer backend (restart)" renders at the top of
+  the existing OpenGL Options menu with the RendererBackends labels. (First attempt collided with
+  the pre-existing `OpenGLOptions` in `menudef.z`, which redefines both it and `VideoOptions` and
+  overrides `menudef.txt` — the selector now lives in the `.z` menu and the `.txt` duplicates are
+  reverted. Note the add_pk3 trap AND the app-bundle pk3 copy both needed manual refresh.)
+- **Core path (`vid_hwrender 1`): renders MAP01 end to end** — walls, flats, lighting, weapon, HUD —
+  on the 64-bit fixed_t base, with the legacy #version-120 lumps failing exactly as a core context
+  must. **Three defects confirmed by the user on the live screen** (user observation is the
+  recording standard here; screenshot-reading has been wrong before):
+  1. **Fonts deformed** — the 2D hook drops DrawParms render style/translation.
+  2. **Weapon sprite cut in half** — the texture-sampling slice (padding vs adopted-handle).
+  3. **Weapon sprite blinks bright/dark** — sprite lighting captured as a global at gl_SetColor
+     time, inheriting the previous surface's color.
+  All three are the plan's known core-path defect classes; the plan's verdict stands — they are
+  fixed by adopting the vendored F2DDrawer/sprite path rather than patching the bespoke queue.
+- **Verification workflow going forward (user direction): manual end-to-end tests** — the user
+  drives the visual verdicts on the live game; automated A/B and screenshots support, not decide.
+
 ## Next actions, in order
 
 1. MCP runtime A/B: `vid_hwrender 0` regression check, then `1`, on the fixed scene set.
