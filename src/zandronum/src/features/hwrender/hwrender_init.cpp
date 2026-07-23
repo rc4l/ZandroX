@@ -330,17 +330,24 @@ void Queue2DTexture(FTexture *img, float x, float y, float w, float h, unsigned 
 void Queue2DTextureUV(FTexture *img, float x, float y, float w, float h,
 	float u0, float v0, float u1, float v1, unsigned int rgba, int translation)
 {
-	const unsigned int handle = GLHandleFor(img, translation, true);
-	if (handle == 0) return;
-	Queued2D q;
-	q.texture = handle;
-	q.x = x; q.y = y; q.w = w; q.h = h;
-	q.u0 = u0; q.v0 = v0; q.u1 = u1; q.v1 = v1;
-	q.r = (rgba >> 16) & 0xff;
-	q.g = (rgba >> 8) & 0xff;
-	q.b = rgba & 0xff;
-	q.a = (rgba >> 24) & 0xff;
-	s_queue2D.push_back(q);
+	// [rc4l] Screen-space quad (the player weapon) through the vendored drawer as an explicit-UV
+	// poly. The colour is captured into the drawer COMMAND here at emission -- the legacy
+	// sequencing sets the psprite's colour immediately before this call, so consumption is
+	// synchronous and the deferred-replay clobber disease cannot reach it.
+	if (img == nullptr) return;
+	FVector4 vt[4];
+	vt[0] = FVector4(x,     y,     u0, v0);
+	vt[1] = FVector4(x + w, y,     u1, v0);
+	vt[2] = FVector4(x,     y + h, u0, v1);
+	vt[3] = FVector4(x + w, y + h, u1, v1);
+	static const unsigned int ind[6] = { 0, 1, 2, 1, 3, 2 };
+	PalEntry color(
+		(BYTE)((rgba >> 24) & 0xff),
+		(BYTE)((rgba >> 16) & 0xff),
+		(BYTE)((rgba >> 8) & 0xff),
+		(BYTE)(rgba & 0xff));
+	s_drawer2D.AddPoly(img, vt, 4, ind, 6, translation, color,
+		LegacyRenderStyles[STYLE_Translucent], nullptr);
 }
 
 void Queue2DTextureLit(FTexture *img, float x, float y, float w, float h,
@@ -415,8 +422,10 @@ void SetSurfaceColor(float r, float g, float b, float a)
 {
 	// [rc4l] Straight into the ported per-draw state -- the draw that follows applies it, and
 	// nothing else reads it later. The captured-global disease (decals/portals/dynlights clobbering
-	// a deferred replay) cannot exist in this shape.
+	// a deferred replay) cannot exist in this shape. The byte mirror exists solely for the weapon's
+	// Queue2DTextureLit, which consumes it synchronously at its own emission.
 	if (s_inScene) OpenGLRenderer::gl_RenderState.SetColor(r, g, b, a);
+	s_surfR = ToByte(r); s_surfG = ToByte(g); s_surfB = ToByte(b); s_surfA = ToByte(a);
 }
 
 void QueueSceneFan(FTexture *tex, const SceneVertex *verts, int count, unsigned int rgba, bool translucent,
